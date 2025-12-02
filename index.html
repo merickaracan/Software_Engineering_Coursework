@@ -1,12 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notebuddy</title>
-    <link rel="stylesheet" href="styles/style.css">
+    <link rel="stylesheet" href="styles/index.css">
+    <link rel="stylesheet" href="styles/fonts.css">
 </head>
+
 <body>
-    <h1 id="title">Welcome to Notebuddy!</h1>
+    <div class="header">
+        <div class="header-toolbar">
+            <div class="left">
+                <img src="images/logo.png" alt="Logo" class="toolbar-logo">
+                <h1 class="toolbar-title">Notebuddy</h1>
+                <button><a href="pages/home.html">Home</a></button>
+            </div>
+            <div class="right">
+                <button id="log-in">Log in</button>
+                <button id="sign-in">Sign in</button>
+            </div>
+        </div>
+        <div class="header-body">
+            <h1>A tight community</h1>
+            <h2>Search for study notes from Bath students</h2>
+            <form action="#">
+                <input type="text" id="search-bar" name="search-bar" placeholder="Search for a module or note">
+            </form>
+        </div>
+    </div>
+    <div class="content">
+        <div class="container">
+            <img src="images/logo.png" alt="">
+            <p>Some text</p>
+        </div>
+        <div class="container">
+            <img src="images/logo.png" alt="">
+            <p>Some text</p>
+        </div>
+        <div class="container">
+            <img src="images/logo.png" alt="">
+            <p>Some text</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <ul>
+            <li>Terms of use</li>
+            <li>Privacy</li>
+            <li>About Us</li>
+            <li>Copyright © Notebuddy</li>
+        </ul>
+    </div>
 </body>
+
 </html>

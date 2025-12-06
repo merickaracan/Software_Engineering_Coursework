@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search</title>
+    <link rel="stylesheet" href="../styles/search.css">
+</head>
+
+<body>
+    <div class="header">
+        <div class="left">
+            <img src="../images/logo.png" alt="Notebuddy logo">
+            <h1>Notebuddy</h1>
+        </div>
+        <div class="right">
+            <!-- <ul>
+                <li>Something</li>
+                <li>Something</li>
+            </ul> -->
+        </div>
+    </div>
+    <div class="search-container">
+        <div class="search-sidebar">
+            <p>Filters</p>
+            <fieldset>
+                <legend>Modules</legend>
+                <label><input type="checkbox" value="algorithms"> Algorithms &amp; Complexity</label>
+                <label><input type="checkbox" value="ml"> Machine Learning</label>
+                <label><input type="checkbox" value="se"> Software Engineering </label>
+                <label><input type="checkbox" value="vc"> Visual Computing</label>
+                <label><input type="checkbox" value="hci"> HCI 1 - FFF</label>
+            </fieldset>
+            <fieldset style="margin-bottom: 0px;">
+                <legend>Date Range</legend>
+                <label><input type="radio" name="date" value="week"> Last Week</label>
+                <label><input type="radio" name="date" value="month"> Last Month</label>
+                <label><input type="radio" name="date" value="year"> Last Year</label>
+                <label><input type="radio" name="date" value="all"> All Time</label>
+            </fieldset>
+        </div>
+
+        <div class="search-results">
+            <div class="search-header">
+                <h2>Search Results</h2>
+                <div class="sort-options">
+                    <label>
+                    Sort by:
+                    <select>
+                        <option>Most Recent</option>
+                        <option>Most Viewed</option>
+                        <option>Highest Rated</option>
+                        <option>Most Liked</option>
+                    </select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="search-result-card">
+                <img src="../images/logo.png" alt="Graph Algorithms note preview">
+                <div class="card-content">
+                    <h3>Graph Algorithms — Lecture 5</h3>
+                    <p class="module">Algorithms &amp; Complexity</p>
+                    <div class="metadata">
+                        <span>12 pages</span>
+                        <span>Nov 28, 2025</span>
+                    </div>
+                </div>
+                <div class="rating">★★★★★ (42)</div>
+            </div>
+
+            <div class="search-result-card">
+                <img src="../images/logo.png" alt="SQL Design note preview">
+                <div class="card-content">
+                    <h3>Database Design — Best Practices</h3>
+                    <p class="module">Databases — Design &amp; SQL</p>
+                    <div class="metadata">
+                        <span>8 pages</span>
+                        <span>Nov 25, 2025</span>
+                    </div>
+                </div>
+                <div class="rating">★★★★☆ (38)</div>
+            </div>
+
+            <div class="search-result-card">
+                <img src="../images/logo.png" alt="ML Foundations note preview">
+                <div class="card-content">
+                    <h3>Machine Learning — Foundations &amp; Linear Regression</h3>
+                    <p class="module">Machine Learning — Foundations</p>
+                    <div class="metadata">
+                        <span>15 pages</span>
+                        <span>Nov 22, 2025</span>
+                    </div>
+                </div>
+                <div class="rating">★★★★★ (67)</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

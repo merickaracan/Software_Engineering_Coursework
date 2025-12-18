@@ -2,7 +2,7 @@
 
 ![Progress](https://img.shields.io/badge/Progress-15%25-orange)
 
-[Live Demo](https://merickaracan.github.io/Software_Engineering_Coursework)
+[Live Demo](https://alphidex.github.io/Software_Engineering_Coursework/)
 
 Group Coursework for CM22007 Software Engineering.
 

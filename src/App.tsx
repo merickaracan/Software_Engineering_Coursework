@@ -1,8 +1,9 @@
-import './App.css'
+// import './styles/App.css'
 //import { useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './Pages/Login';
 import Register from './Pages/Register';
+import Home from './Pages/Home';
 
 function App() {
   //const [token, useToken] = useState(localStorage.getItem("token"));
@@ -11,9 +12,9 @@ function App() {
   return(
     <Router>
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path = "/" element={<Navigate to="/login"/>} />
       </Routes>
     </Router>
   )

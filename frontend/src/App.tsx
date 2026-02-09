@@ -1,9 +1,9 @@
 // import './styles/App.css'
 //import { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Login from './Pages/Login';
-import Register from './Pages/Register';
-import Home from './Pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Home from './pages/Home';
 
 function App() {
   //const [token, useToken] = useState(localStorage.getItem("token"));

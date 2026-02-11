@@ -1,4 +1,4 @@
-import "../styles/Home.css";
+import style from "../styles/Home.module.css";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -59,9 +59,9 @@ const Home = () => {
                 </Text>
                 
                 <Carousel arrows={true}>
-                    <div className="home-carousel-div"><h1>Display 1 slide - Insert image + description</h1></div>
-                    <div className="home-carousel-div"><h1>Display 2 slide</h1></div>
-                    <div className="home-carousel-div"><h1>Display 3 slide</h1></div>
+                    <div className={style["home-carousel-div"]}><h1>Display 1 slide - Insert image + description</h1></div>
+                    <div className={style["home-carousel-div"]}><h1>Display 2 slide</h1></div>
+                    <div className={style["home-carousel-div"]}><h1>Display 3 slide</h1></div>
                 </Carousel>
 
                 <Title level={2} style={{ marginTop: "40px" }}>How It Works</Title>

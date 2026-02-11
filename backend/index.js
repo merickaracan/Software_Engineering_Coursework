@@ -1,6 +1,20 @@
+// Possible TODOs:
+// - Verify token expiration (e.g., 24 hours)
+// - Implement password reset functionality
+// - Add rate limiting to prevent brute-force attacks
+// - Signed tokens for quier login (JWT)
+// - Use environment variables for secrets and database configuration
+
+
 const express = require("express");
+const bcrypt = require("bcrypt");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 
 const app = express();
+const JWT_SECRET = "your_mom";
+const data = []; // Temporary in-memory "database" (replace with real database)
+
 
 // Allows Express to read JSON (otherwise silent failure)
 app.use(express.json());
@@ -65,11 +79,11 @@ function validateRegistration(data) {
 }
 
 // Register User
-app.post("/api/register", (req, res) => {
+app.post("/api/register", async (req, res) => {
   const { name, email, password } = req.body;
 
   // Validate input
-  const validationErrors = validateRegistration({ name, email, password, confirmPassword });
+  const validationErrors = validateRegistration({ name, email, password });
   
   if (validationErrors.length > 0) {
     return res.status(400).json({
@@ -78,15 +92,135 @@ app.post("/api/register", (req, res) => {
     });
   }
 
-  // TODO: Check if email already exists in database
-  // TODO: Hash password before storing
-  // TODO: Save user to database
+  // Check if email already exists in database
+  const existingUser = data.find(user => user.email === email);
+  if (existingUser) {
+    return res.status(409).json({
+      ok: false,
+      errors: ["Email is already registered."],
+    });
+  }
+
+  // Hash password before storing
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // Save user to database
+  const verifyToken = crypto.randomBytes(32).toString("hex");
+  const verifyLink = `http://localhost:3000/api/confirm?token=${verifyToken}`;
+  data.push({ 
+    name, 
+    email, 
+    hashedPassword, 
+    verified: false, 
+    verifyToken,
+  });
 
   res.json({
     ok: true,
     message: "Account created successfully",
+    body: { name, email, hashedPassword, verifyLink }, // For testing purposes only – do not return password in real applications
   });
 })
+
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      ok: false,
+      message: "Email and password are required.",
+    });
+  }
+
+  const user = data.find(u => u.email === email);
+
+  if (!user) {
+    return res.status(401).json({
+      ok: false,
+      message: "Invalid email or password.",
+    });
+  }
+
+  if (!user.verified) {
+    return res.status(403).json({
+      ok: false,
+      message: "Email not verified. Please check your inbox.",
+    });
+  }
+
+  const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
+
+  if (!isPasswordValid) {
+    return res.status(401).json({
+      ok: false,
+      message: "Invalid email or password.",
+    });
+  }
+
+  const token = jwt.sign(
+    { email: user.email }, 
+    JWT_SECRET, 
+    { expiresIn: "12h" }
+  );
+
+  res.json({
+    ok: true,
+    message: "Login successful.",
+    token,
+  });
+});
+
+
+app.get("/api/confirm", (req, res) => {
+  const { token } = req.query;
+
+  const user = data.find(u => u.verifyToken === token);
+
+  if (!user) {
+    return res.status(400).json({
+      ok: false,
+      message: "Invalid or expired token.",
+    });
+  }
+
+  user.verified = true;
+  user.verifyToken = null; // Invalidate token after use
+
+  res.json({
+    ok: true,
+    message: "Email verified successfully!",
+  });
+});
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+
+  if (!header) {
+    return res.status(401).json({ ok: false, message: "Authorization header missing." });
+  }
+
+  const [type, token] = header.split(" ");
+
+  if (type !== "Bearer" || !token) {
+    return res.status(401).json({ ok: false, message: "Invalid authorization format." });
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload; // attach user info for later
+    next();
+  } catch {
+    return res.status(401).json({ ok: false, error: "Invalid or expired token" });
+  }
+}
+
+app.get("/api/me", requireAuth, (req, res) => {
+  res.json({
+    ok: true,
+    user: req.user
+  });
+});
+
 
 // Creates a server that listens at port 3000
 app.listen(3000, () => {

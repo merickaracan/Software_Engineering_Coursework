@@ -1,11 +1,5 @@
 // Get
 
-async function test_get_request(){
-    const request = await fetch("/api/register");
-    const json_data = await request.json();
-    console.log(json_data);
-}
-
 async function test_register(){
     const request = await fetch("/api/register", {
         method: "POST",
@@ -13,13 +7,39 @@ async function test_register(){
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            email: "test@example.com",
-            password: "12345678"
+            name: "Test",
+            email: "test@bath.ac.uk",
+            password: "Password123!",
         })
     })
 
     const json_data = await request.json();
     console.log(json_data);
+
+    const verifyLink = json_data.body.verifyLink;
+    request = await fetch(verifyLink);
+    console.log(await request.json());  
 }
 
-export default [test_get_request, test_register];
+async function test_jwttoken(){
+    const loginRes = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "test@bath.ac.uk", password: "Password123!" })
+    });
+
+    const loginData = await loginRes.json();
+    console.log(loginData);
+
+    const token = loginData.token;
+
+    const meRes = await fetch("/api/me", {
+    headers: {
+        Authorization: `Bearer ${token}`
+    }
+    });
+
+    console.log(await meRes.json());
+}
+
+export default [test_register, test_jwttoken];

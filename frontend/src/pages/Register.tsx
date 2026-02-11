@@ -65,16 +65,30 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
   const [passwordVisible, setPasswordVisible] = useState(false);
 
-  const onFinish = (values: RegisterFormValues) => {
+  const onFinish = async (values: RegisterFormValues) => {
     // Demo only – no backend call
     console.log("Register form submitted:", values);
 
-    message.success("Account created (demo only – no real signup yet)");
+    const { name, email, password } = values;
 
-    setTimeout(() => {
-      // Go back to login after "success"
-      navigate("/");
-    }, 800);
+    const request = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    const data = await request.json();
+
+    // Failure
+    if (!request.ok) {
+      const errorMessages = data.errors ? data.errors.join(",\n") : "Unknown error.";
+      message.error(`Failed to create account: ${errorMessages}`);
+      return;
+    }
+
+    // Success
+    message.success("Account created (demo only – no real signup yet)");
+    navigate("/login");
   };
 
   const onFinishFailed = () => {
@@ -189,7 +203,7 @@ const Register: React.FC = () => {
                     >
                       <Input
                         prefix={<MailOutlined />}
-                        placeholder="ab1234@bath.ac."
+                        placeholder="ab1234@bath.ac.uk"
                         size="large"
                       />
                     </Form.Item>
@@ -250,7 +264,7 @@ const Register: React.FC = () => {
                   <div style={{ textAlign: "center", marginTop: 12 }}>
                     <Text type="secondary" style={{ fontSize: 13 }}>
                       Already have an account?{" "}
-                      <a href="/" style={{ color: "#0b5ed7", fontWeight: 500 }}>
+                      <a href="/login" style={{ color: "#0b5ed7", fontWeight: 500 }}>
                         Back to login
                       </a>
                     </Text>

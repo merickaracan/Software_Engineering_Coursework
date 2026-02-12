@@ -33,8 +33,18 @@ const Login: React.FC = () => {
   const onFinish = (values: LoginFormValues) => {
     setLoading(true);
     setTimeout(() => {
+      // Look up user from registered users
+      const stored = localStorage.getItem("registeredUsers");
+      const registeredUsers: Record<string, { name: string; email: string }> =
+        stored ? JSON.parse(stored) : {};
+
+      const matched = registeredUsers[values.email];
+      if (matched) {
+        localStorage.setItem("user", JSON.stringify(matched));
+      }
+
       console.log("Login form submitted:", values);
-      message.success("Logged in succesfully");
+      message.success("Logged in successfully");
       setLoading(false);
       navigate("/dashboard");
     }, 700);
@@ -66,6 +76,7 @@ const Login: React.FC = () => {
                   bordered={false}
                   style={{
                     height: "100%",
+                    minHeight: 500,
                     background:
                       "linear-gradient(145deg, #0b5ed7 0%, #1d74f5 40%, #3a8bff 100%)",
                     color: "#fff",
@@ -74,14 +85,15 @@ const Login: React.FC = () => {
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
+                    alignItems: "center",
                     height: "100%",
                     padding: "32px",
                   }}
                 >
-                  <Title level={2} style={{ color: "#fff", marginBottom: 16 }}>
-                    Welcome to Notebuddy 
+                  <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
+                    Welcome to Notebuddy
                   </Title>
-                  <Text style={{ color: "#dbe8ff", fontSize: 14 }}>
+                  <Text style={{ color: "#dbe8ff", fontSize: 14, textAlign: "center" }}>
                     Log in to access your workspace, track your notes, and
                     continue where you left off.
                   </Text>
@@ -101,11 +113,12 @@ const Login: React.FC = () => {
                   bordered={false}
                   style={{
                     borderRadius: 16,
+                    minHeight: 500,
                     boxShadow:
                       "0 18px 40px rgba(15, 35, 95, 0.18)",
                     backgroundColor: "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px" }}
+                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
                   <Space
                     direction="vertical"

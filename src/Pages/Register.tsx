@@ -33,13 +33,21 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
 
   const onFinish = (values: RegisterFormValues) => {
-    // Demo only – no backend call
-    console.log("Register form submitted:", values);
+    // Save to persistent registered users store (demo – no backend)
+    const stored = localStorage.getItem("registeredUsers");
+    const registeredUsers: Record<string, { name: string; email: string }> =
+      stored ? JSON.parse(stored) : {};
 
-    message.success("Account created (demo only – no real signup yet)");
+    registeredUsers[values.email] = {
+      name: values.name,
+      email: values.email,
+    };
+    localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers));
+
+    console.log("Register form submitted:", values);
+    message.success("Account created successfully!");
 
     setTimeout(() => {
-      // Go back to login after "success"
       navigate("/");
     }, 800);
   };
@@ -82,14 +90,15 @@ const Register: React.FC = () => {
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
+                    alignItems: "center",
                     height: "100%",
                     padding: "32px",
                   }}
                 >
-                  <Title level={2} style={{ color: "#fff", marginBottom: 16 }}>
+                  <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
                     Create your account
                   </Title>
-                  <Text style={{ color: "#dbe8ff", fontSize: 14 }}>
+                  <Text style={{ color: "#dbe8ff", fontSize: 14, textAlign: "center" }}>
                     Sign up to start sharing your notes and contributing to your
                     peers.
                   </Text>
@@ -105,7 +114,7 @@ const Register: React.FC = () => {
                     boxShadow: "0 18px 40px rgba(15, 35, 95, 0.18)",
                     backgroundColor: "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px" }}
+                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
                   <Space
                     direction="vertical"

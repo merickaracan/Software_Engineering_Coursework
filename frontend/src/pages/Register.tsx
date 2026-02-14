@@ -86,6 +86,8 @@ const Register: React.FC = () => {
       return;
     }
 
+    console.log("Verification Link", data.verifyLink);
+
     // Success
     message.success("Account created (demo only – no real signup yet)");
     navigate("/login");

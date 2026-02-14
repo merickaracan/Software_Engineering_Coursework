@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
 import VerifyEmail from './pages/VerifyEmail';
+import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 
 function App() {
   //const [token, useToken] = useState(localStorage.getItem("token"));
@@ -17,6 +19,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </Router>
   )

@@ -96,7 +96,7 @@ router.post("/register", async (req, res) => {
 
   // Save user to database
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyLink = `${process.env.APP_BASE_URL}/verify-email?token=${verifyToken}`;
+  const verifyLink = `${process.env.FRONTEND_URL}/verify-email?email=${encodeURIComponent(email)}&token=${verifyToken}`;
 
   // Add data to database
   data.push({ 
@@ -164,9 +164,13 @@ router.post("/login", async (req, res) => {
 
 
 router.get("/confirm", (req, res) => {
-  const { token } = req.query;
+  const { email, token } = req.query;
 
-  const user = data.find(u => u.verifyToken === token);
+  console.log("Backend: received token for confirmation:", token);
+  console.log("Backend: received email for confirmation:", email);
+  console.log("Current users in database:", data);
+
+  const user = data.find(u => u.email === email && u.verifyToken === token);
 
   if (!user) {
     return res.status(400).json({

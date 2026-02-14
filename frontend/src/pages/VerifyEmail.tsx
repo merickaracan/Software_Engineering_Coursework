@@ -19,6 +19,7 @@ const VerifyEmail = () => {
 
     useEffect(() => {
         const verifyEmail = async () => {
+            const email = searchParams.get("email");
             const token = searchParams.get("token");
 
             if (!token) {
@@ -28,7 +29,7 @@ const VerifyEmail = () => {
             }
 
             try {
-                const response = await fetch(`http://localhost:3000/api/confirm?token=${token}`);
+                const response = await fetch(`/api/confirm?email=${encodeURIComponent(email)}&token=${token}`);
                 const data = await response.json();
 
                 if (data.ok) {

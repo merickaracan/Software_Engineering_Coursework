@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import "antd/dist/reset.css"
 import App from './App.tsx'
 // import './styles/index.css'
-import function_list from './test_backend.js'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -12,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
 )
 
 
-// Testing functions
-function_list.forEach(element => {
-  element()
-});
+// Testing functions -- don't test emails pls
+// function_list.forEach(element => {
+//   element()
+// });

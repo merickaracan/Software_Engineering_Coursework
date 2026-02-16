@@ -21,6 +21,22 @@ import {
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
+const LoginRules = {
+  email: [
+      { required: true, message: "Please enter your email." },
+      { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
+      { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
+  ],
+  password: [
+    { required: true, message: "Please enter your password." },
+    { min: 8, message: "Password must be at least 8 characters." },
+    { pattern: /[a-z]/, message: "Must contain at least one lowercase letter." },
+    { pattern: /[A-Z]/, message: "Must contain at least one uppercase letter." },
+    { pattern: /[0-9]/, message: "Must contain at least one number." },
+    { pattern: /[!@#$%^&*(),.?":{}|<>]/, message: "Must contain at least one symbol." },
+  ],
+};
+
 interface LoginFormValues {
   email: string;
   password: string;
@@ -30,14 +46,26 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const onFinish = (values: LoginFormValues) => {
+  const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
-    setTimeout(() => {
-      console.log("Login form submitted:", values);
-      message.success("Logged in succesfully");
+
+    const request = await fetch("/api/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json",},
+      body: JSON.stringify(values)
+    })
+
+    const data = await request.json();
+
+    if (!data.ok) {
+      message.error(data.message || "Login failed. Please try again.");
       setLoading(false);
-      navigate("/dashboard");
-    }, 700);
+      return;
+    }
+
+    message.success("Logged in successfully");
+    setLoading(false);
+    navigate("/dashboard");
   };
 
   const onFinishFailed = () => {
@@ -133,10 +161,7 @@ const Login: React.FC = () => {
                     <Form.Item
                       label="Email"
                       name="email"
-                      rules={[
-                        { required: true, message: "Please enter your email." },
-                        { type: "email", message: "Please enter a valid email." },
-                      ]}
+                      rules={LoginRules.email}
                     >
                       <Input
                         prefix={<UserOutlined />}
@@ -148,10 +173,7 @@ const Login: React.FC = () => {
                     <Form.Item
                       label="Password"
                       name="password"
-                      rules={[
-                        { required: true, message: "Please enter your password." },
-                        { min: 6, message: "Password should be at least 6 characters." },
-                      ]}
+                      rules={LoginRules.password}
                     >
                       <Input.Password
                         prefix={<LockOutlined />}

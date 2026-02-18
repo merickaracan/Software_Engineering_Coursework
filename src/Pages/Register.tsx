@@ -17,7 +17,10 @@ import {
   MailOutlined,
   LockOutlined,
   CheckCircleOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
+import { useTheme } from "../Components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -31,6 +34,7 @@ interface RegisterFormValues {
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const onFinish = (values: RegisterFormValues) => {
     // Save to persistent registered users store (demo – no backend)
@@ -61,10 +65,26 @@ const Register: React.FC = () => {
       style={{
         minHeight: "100vh",
         width: "100%", 
-        background: "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
+        background: isDark
+          ? "linear-gradient(135deg, #0a1628 0%, #141414 60%)"
+          : "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
       }}
     >
-      <Content style={{ padding: "40px 20px" }}>
+      <Content style={{ padding: "40px 20px", position: "relative" }}>
+        <div
+          onClick={toggleTheme}
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 32,
+            cursor: "pointer",
+            fontSize: 22,
+            color: "#fff",
+            zIndex: 10,
+          }}
+        >
+          {isDark ? <SunOutlined /> : <MoonOutlined />}
+        </div>
         <Row
           justify="center"
           align="middle"
@@ -112,7 +132,7 @@ const Register: React.FC = () => {
                   style={{
                     borderRadius: 16,
                     boxShadow: "0 18px 40px rgba(15, 35, 95, 0.18)",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
                   bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
@@ -125,7 +145,7 @@ const Register: React.FC = () => {
                       level={3}
                       style={{
                         margin: 0,
-                        color: "#1f2933",
+                        color: isDark ? "#fff" : "#1f2933",
                         textAlign: "center",
                       }}
                     >

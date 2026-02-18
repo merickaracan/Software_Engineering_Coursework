@@ -18,13 +18,17 @@ import {
   BookOutlined,
   CalendarOutlined,
   LogoutOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
+import { useTheme } from "../Components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Header, Content } = Layout;
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const stored = localStorage.getItem("user");
   const user = stored ? JSON.parse(stored) : null;
@@ -33,16 +37,17 @@ const Profile: React.FC = () => {
   const email = user?.email ?? "No email set";
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "#f0f5ff" }}>
+    <Layout style={{ minHeight: "100vh", background: isDark ? "#141414" : "#f0f5ff" }}>
       {/* Top bar – same style as Dashboard */}
       <Header
         style={{
-          background: "#fff",
+          background: isDark ? "#1f1f1f" : "#fff",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 32px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          boxShadow: isDark ? "0 2px 12px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.08)",
+          borderBottom: isDark ? "1px solid #303030" : undefined,
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -50,30 +55,45 @@ const Profile: React.FC = () => {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <ArrowLeftOutlined
-            style={{ fontSize: 18, color: "#0b5ed7", cursor: "pointer" }}
+            style={{ fontSize: 18, color: isDark ? "#4da3ff" : "#0b5ed7", cursor: "pointer" }}
             onClick={() => navigate("/dashboard")}
           />
-          <Title level={4} style={{ margin: 0, color: "#0b5ed7" }}>
+          <Title level={4} style={{ margin: 0, color: isDark ? "#4da3ff" : "#0b5ed7" }}>
             Notebuddy
           </Title>
         </div>
-        <Avatar
-          size={40}
-          icon={<UserOutlined />}
-          style={{ backgroundColor: "#0b5ed7" }}
-        />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            onClick={toggleTheme}
+            style={{
+              cursor: "pointer",
+              fontSize: 20,
+              color: isDark ? "#fff" : "#0b5ed7",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {isDark ? <SunOutlined /> : <MoonOutlined />}
+          </div>
+          <Avatar
+            size={40}
+            icon={<UserOutlined />}
+            style={{ backgroundColor: "#0b5ed7" }}
+          />
+        </div>
       </Header>
 
       {/* Main content */}
       <Content style={{ padding: "32px" }}>
         <Row justify="center">
           <Col xs={24} md={18} lg={14}>
-
             {/* Profile header card */}
             <Card
               style={{
                 borderRadius: 12,
-                boxShadow: "0 4px 12px rgba(15,35,95,0.08)",
+                boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                border: isDark ? "1px solid #303030" : undefined,
+                background: isDark ? "#1f1f1f" : "#fff",
                 marginBottom: 24,
               }}
               bodyStyle={{
@@ -101,18 +121,30 @@ const Profile: React.FC = () => {
               title="Student Details"
               style={{
                 borderRadius: 12,
-                boxShadow: "0 4px 12px rgba(15,35,95,0.08)",
+                boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                border: isDark ? "1px solid #303030" : undefined,
+                background: isDark ? "#1f1f1f" : "#fff",
                 marginBottom: 24,
               }}
             >
               <Descriptions column={1} colon={false}>
                 <Descriptions.Item
-                  label={<><UserOutlined style={{ marginRight: 8 }} />Name</>}
+                  label={
+                    <>
+                      <UserOutlined style={{ marginRight: 8 }} />
+                      Name
+                    </>
+                  }
                 >
                   {name}
                 </Descriptions.Item>
                 <Descriptions.Item
-                  label={<><MailOutlined style={{ marginRight: 8 }} />Email</>}
+                  label={
+                    <>
+                      <MailOutlined style={{ marginRight: 8 }} />
+                      Email
+                    </>
+                  }
                 >
                   {email}
                 </Descriptions.Item>
@@ -124,7 +156,9 @@ const Profile: React.FC = () => {
               title="Modules"
               style={{
                 borderRadius: 12,
-                boxShadow: "0 4px 12px rgba(15,35,95,0.08)",
+                boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                border: isDark ? "1px solid #303030" : undefined,
+                background: isDark ? "#1f1f1f" : "#fff",
                 marginBottom: 24,
               }}
             >
@@ -141,7 +175,9 @@ const Profile: React.FC = () => {
             <Card
               style={{
                 borderRadius: 12,
-                boxShadow: "0 4px 12px rgba(15,35,95,0.08)",
+                boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                border: isDark ? "1px solid #303030" : undefined,
+                background: isDark ? "#1f1f1f" : "#fff",
               }}
             >
               <Row gutter={[16, 16]}>
@@ -177,7 +213,6 @@ const Profile: React.FC = () => {
                 </Col>
               </Row>
             </Card>
-
           </Col>
         </Row>
       </Content>

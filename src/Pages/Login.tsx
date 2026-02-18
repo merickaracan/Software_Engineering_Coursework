@@ -16,7 +16,10 @@ import {
   UserOutlined,
   LockOutlined,
   LoginOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
+import { useTheme } from "../Components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -29,6 +32,7 @@ interface LoginFormValues {
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const onFinish = (values: LoginFormValues) => {
     setLoading(true);
@@ -58,10 +62,26 @@ const Login: React.FC = () => {
     <Layout
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
+        background: isDark
+          ? "linear-gradient(135deg, #0a1628 0%, #141414 60%)"
+          : "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
       }}
     >
       <Content>
+        <div
+          onClick={toggleTheme}
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 32,
+            cursor: "pointer",
+            fontSize: 22,
+            color: "#fff",
+            zIndex: 10,
+          }}
+        >
+          {isDark ? <SunOutlined /> : <MoonOutlined />}
+        </div>
         <Row
           justify="center"
           align="middle"
@@ -116,7 +136,7 @@ const Login: React.FC = () => {
                     minHeight: 500,
                     boxShadow:
                       "0 18px 40px rgba(15, 35, 95, 0.18)",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
                   bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
@@ -127,7 +147,7 @@ const Login: React.FC = () => {
                   >
                     <Title
                       level={3}
-                      style={{ margin: 0, color: "#1f2933", textAlign: "center" }}
+                      style={{ margin: 0, color: isDark ? "#fff" : "#1f2933", textAlign: "center" }}
                     >
                       Login
                     </Title>

@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Note from './pages/Note';
 
 function App() {
   //const [token, useToken] = useState(localStorage.getItem("token"));
@@ -21,6 +22,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/notes" element={<Note />} />
       </Routes>
     </Router>
   )

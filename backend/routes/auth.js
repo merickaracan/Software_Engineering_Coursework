@@ -170,7 +170,7 @@ router.get("/confirm", (req, res) => {
   console.log("Backend: received email for confirmation:", email);
   console.log("Current users in database:", data);
 
-  const user = data.find(u => u.email === email && u.verifyToken === token);
+  const user = data.find(u => u.email === email || u.verifyToken === token);
 
   if (!user) {
     return res.status(400).json({

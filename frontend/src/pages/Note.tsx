@@ -80,8 +80,6 @@ const Note: React.FC = () => {
 		},
 	});
 
-	// const [fontSize, setFontSize] = useState(14);
-
 	return (
 		<Layout style={{ minHeight: "100vh", background: "#f0f5ff" }}>
 			<Header
@@ -196,7 +194,7 @@ function handleKeyDown(view, event: KeyboardEvent) {
       state.tr.insertText("    ")
     );
 
-    return true; // tell ProseMirror we handled it
+    return true;
   }
 
   return false;

@@ -6,6 +6,8 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { ConfigProvider, theme } from "antd";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -36,8 +38,12 @@ function App() {
     return <div style={{ minHeight: "100vh" }}></div>;
   }
 
-  return (
-    <Router>
+  const { isDark } = useTheme();
+
+  return(
+    <ThemeProvider>
+    <ConfigProvider theme={{algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,}}>
+      <Router>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
@@ -56,6 +62,8 @@ function App() {
         )}
       </Routes>
     </Router>
+    </ConfigProvider>
+    </ThemeProvider>
   );
 }
 

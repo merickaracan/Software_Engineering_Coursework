@@ -22,9 +22,9 @@ function initializeLocalDatabase() {
         db.run(`
             CREATE TABLE IF NOT EXISTS user_data (
                 email TEXT PRIMARY KEY,
-                is_lecturer INTEGER NOT NULL DEFAULT 0 CHECK (is_lecturer IN (0,1)),
+                lecturer INTEGER NOT NULL DEFAULT 0 CHECK (lecturer IN (0,1)),
                 points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
-                password_hash TEXT NOT NULL
+                passkey TEXT NOT NULL
             )
         `);
 

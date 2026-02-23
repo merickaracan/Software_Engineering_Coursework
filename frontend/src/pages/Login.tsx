@@ -42,7 +42,9 @@ interface LoginFormValues {
   password: string;
 }
 
-const Login: React.FC = () => {
+
+
+const Login = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -52,6 +54,7 @@ const Login: React.FC = () => {
     const request = await fetch("/api/login", {
       method: "POST",
       headers: {"Content-Type": "application/json",},
+      credentials: "include",
       body: JSON.stringify(values)
     })
 
@@ -63,9 +66,16 @@ const Login: React.FC = () => {
       return;
     }
 
+    // Set authentication state if callback provided
+    if (setIsAuthenticated) {
+      setIsAuthenticated(true);
+    }
+
     message.success("Logged in successfully");
     setLoading(false);
-    navigate("/dashboard");
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 1000);
   };
 
   const onFinishFailed = () => {

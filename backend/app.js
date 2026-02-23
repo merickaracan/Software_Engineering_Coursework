@@ -3,11 +3,12 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
 app.use(cors());
-// Allows Express to read JSON (otherwise silent failure)
+app.use(cookieParser());
 app.use(express.json());
 
 // Mount auth routes

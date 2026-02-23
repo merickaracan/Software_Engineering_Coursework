@@ -66,9 +66,6 @@ const Register: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
 
   const onFinish = async (values: RegisterFormValues) => {
-    // Demo only – no backend call
-    console.log("Register form submitted:", values);
-
     const { name, email, password } = values;
 
     const request = await fetch("/api/register", {
@@ -86,11 +83,11 @@ const Register: React.FC = () => {
       return;
     }
 
-    console.log("Verification Link", data.verifyLink);
-
     // Success
-    message.success("Account created (demo only – no real signup yet)");
-    navigate("/login");
+    message.success("Account created!");
+    setTimeout(() => {
+      navigate("/login");
+    }, 2000);
   };
 
   const onFinishFailed = () => {

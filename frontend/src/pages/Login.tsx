@@ -15,8 +15,11 @@ import {
 import {
   UserOutlined,
   LockOutlined,
-  LoginOutlined,
+  LoginOutlined,  
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
+import { useTheme } from "../components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -42,9 +45,12 @@ interface LoginFormValues {
   password: string;
 }
 
-const Login: React.FC = () => {
+
+
+const Login = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
@@ -52,6 +58,7 @@ const Login: React.FC = () => {
     const request = await fetch("/api/login", {
       method: "POST",
       headers: {"Content-Type": "application/json",},
+      credentials: "include",
       body: JSON.stringify(values)
     })
 
@@ -63,9 +70,16 @@ const Login: React.FC = () => {
       return;
     }
 
+    // Set authentication state if callback provided
+    if (setIsAuthenticated) {
+      setIsAuthenticated(true);
+    }
+
     message.success("Logged in successfully");
     setLoading(false);
-    navigate("/dashboard");
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 1000);
   };
 
   const onFinishFailed = () => {
@@ -76,10 +90,26 @@ const Login: React.FC = () => {
     <Layout
       style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
+        background: isDark
+          ? "linear-gradient(135deg, #0a1628 0%, #141414 60%)"
+          : "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
       }}
     >
       <Content>
+        <div
+          onClick={toggleTheme}
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 32,
+            cursor: "pointer",
+            fontSize: 22,
+            color: "#fff",
+            zIndex: 10,
+          }}
+        >
+          {isDark ? <SunOutlined /> : <MoonOutlined />}
+        </div>
         <Row
           justify="center"
           align="middle"

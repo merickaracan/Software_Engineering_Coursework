@@ -12,6 +12,13 @@ app.use(express.json());
 
 // Mount auth routes
 const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/userRoutes");
+const notesRoutes = require("./routes/notesRoutes");
+const suggestionRoutes = require("./routes/suggestionRoutes");
+
 app.use("/api", authRoutes);
+app.use("/api", userRoutes);
+app.use("/api", notesRoutes);
+app.use("/api", suggestionRoutes);
 
 module.exports = app;

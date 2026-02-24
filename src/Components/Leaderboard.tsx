@@ -24,7 +24,11 @@ const rankLabels: Record<number, string> = {
   3: "3rd",
 };
 
-const Leaderboard: React.FC = () => {
+interface LeaderboardProps {
+  onTitleClick?: () => void;
+}
+
+const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const { isDark } = useTheme();
 
@@ -65,13 +69,25 @@ const Leaderboard: React.FC = () => {
       },
     },
     {
-      title: "Student",
+      title: "Name",
       dataIndex: "name",
       key: "name",
       render: (name: string) => <Text strong>{name}</Text>,
     },
     {
-      title: "Avg Rating",
+      title: "Email",
+      dataIndex: "email",
+      key: "email",
+      render: (email: string) => <Text style={{ fontSize: 13 }}>{email}</Text>,
+    },
+    {
+      title: "Total Notes Shared",
+      dataIndex: "totalNotes",
+      key: "totalNotes",
+      render: (count: number) => <Text>{count}</Text>,
+    },
+    {
+      title: "Avg Rating per Note",
       dataIndex: "avgRating",
       key: "avgRating",
       render: (rating: number) => (
@@ -81,19 +97,19 @@ const Leaderboard: React.FC = () => {
         </span>
       ),
     },
-    {
-      title: "Notes Shared",
-      dataIndex: "totalNotes",
-      key: "totalNotes",
-      render: (count: number) => <Text>{count}</Text>,
-    },
   ];
 
   return (
     <section style={{ marginBottom: 48 }}>
       <Row align="middle" style={{ marginBottom: 16 }}>
         <TrophyOutlined style={{ fontSize: 22, color: isDark ? "#4da3ff" : "#0b5ed7", marginRight: 10 }} />
-        <Title level={3} style={{ margin: 0 }}>Leaderboard</Title>
+        <Title
+          level={3}
+          style={{ margin: 0, cursor: onTitleClick ? "pointer" : undefined }}
+          onClick={onTitleClick}
+        >
+          Leaderboard
+        </Title>
       </Row>
       <Card
         style={{
@@ -103,17 +119,14 @@ const Leaderboard: React.FC = () => {
           background: isDark ? "#1f1f1f" : "#fff",
         }}
       >
-        {sorted.length > 0 ? (
-          <Table
-            dataSource={sorted}
-            columns={columns}
-            rowKey="email"
-            pagination={false}
-            size="middle"
-          />
-        ) : (
-          <Empty description="No leaderboard data yet. Ratings will appear as notes get reviewed." />
-        )}
+        <Table
+          dataSource={sorted}
+          columns={columns}
+          rowKey="email"
+          pagination={false}
+          size="middle"
+          locale={{ emptyText: "No students yet. Ratings will appear as notes get reviewed." }}
+        />
       </Card>
     </section>
   );

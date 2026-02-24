@@ -14,7 +14,11 @@ const AVAILABLE_MODULES = [
   { id: "ai", name: "Artificial Intelligence", code: "CM50170" },
 ];
 
-const Modules: React.FC = () => {
+interface ModulesProps {
+  onTitleClick?: () => void;
+}
+
+const Modules: React.FC<ModulesProps> = ({ onTitleClick }) => {
   const [selected, setSelected] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const { isDark } = useTheme();
@@ -47,7 +51,13 @@ const Modules: React.FC = () => {
       <Row align="middle" justify="space-between" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center" }}>
           <BookOutlined style={{ fontSize: 22, color: isDark ? "#4da3ff" : "#0b5ed7", marginRight: 10 }} />
-          <Title level={3} style={{ margin: 0 }}>Modules</Title>
+          <Title
+            level={3}
+            style={{ margin: 0, cursor: onTitleClick ? "pointer" : undefined }}
+            onClick={onTitleClick}
+          >
+            Modules
+          </Title>
         </div>
         <Input
           placeholder="Search modules..."

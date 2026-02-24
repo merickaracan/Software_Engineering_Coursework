@@ -34,8 +34,8 @@ router.get("/notes/email/:email",async (req,res) =>{
 
 router.post("/notes",async (req,res) =>{
     try{
-        const {email,verified,note_data,rating_average,number_ratings,module} = req.body;
-        const [result] = await db.query("INSERT INTO notes (email,verified,note_data,rating_average,number_ratings,module) VALUES (?, ?, ?, ?, ?, ?)",[email,verified,note_data,rating_average,number_ratings,module]);
+        const {email,verified,note_data,rating_average,number_ratings,module,note_title} = req.body;
+        const [result] = await db.query("INSERT INTO notes (email,verified,note_data,rating_average,number_ratings,module,note_title) VALUES (?, ?, ?, ?, ?, ?, ?)",[email,verified,note_data,rating_average,number_ratings,module,note_title]);
         return res.status(201).json({
             ok: true,
             message: "Note created",
@@ -63,8 +63,8 @@ router.delete("/notes/:id", async (req,res) =>{
 
 router.put("/notes/:id", async (req,res) =>{
     try{
-        const {email,verified,note_data,rating_average,number_ratings,module} = req.body;
-        const [result] = await db.query("UPDATE notes SET email = ?,verified = ?,note_data = ?,rating_average = ?,number_ratings = ?,module = ?  WHERE id = ?",[email,verified,note_data,rating_average,number_ratings,module,req.params.id]);
+        const {email,verified,note_data,rating_average,number_ratings,module,note_title} = req.body;
+        const [result] = await db.query("UPDATE notes SET email = ?,verified = ?,note_data = ?,rating_average = ?,number_ratings = ?,module = ?, note_title = ?  WHERE id = ?",[email,verified,note_data,rating_average,number_ratings,module,note_title,req.params.id]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Note not found" });
         }

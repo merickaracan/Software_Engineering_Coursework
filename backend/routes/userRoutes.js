@@ -15,7 +15,6 @@ router.get("/users/:email", async (req, res) => {
 router.post("/users",async (req,res) =>{
     try{
         const {email,passkey,lecturer,points} = req.body;
-
         const [result] = await db.query("INSERT INTO user_data (email,passkey,lecturer,points) VALUES (?, ?, ?, ?)",[email,passkey,lecturer,points]);
         return res.status(201).json({
             ok: true,

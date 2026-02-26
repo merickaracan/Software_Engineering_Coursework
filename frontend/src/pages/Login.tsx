@@ -31,6 +31,7 @@ const LoginRules: Record<string, Rule[]> = {
   
   password: [
     { required: true, message: "Please enter your password." },
+
   ],
   
 };
@@ -63,7 +64,11 @@ const Login: React.FC = () => {
 
     message.success("Logged in successfully");
     setLoading(false);
+    localStorage.setItem("token", data.token)
+    localStorage.setItem("user", JSON.stringify({ email: values.email }));
     navigate("/dashboard");
+
+
   };
 
   const onFinishFailed = () => {

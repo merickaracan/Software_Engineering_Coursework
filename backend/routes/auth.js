@@ -4,9 +4,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const requireAuth = require("../middleware/requireAuth");
+const { getUser, createUser, updateUser, deleteUser } = require("../services/userService");
 
-
-const data = []; // Temporary in-memory "database" (replace with real database)
 const JWT_SECRET = process.env.JWT_SECRET || "default";
 
 // Registration validation rules
@@ -83,7 +82,7 @@ router.post("/register", async (req, res) => {
   }
 
   // Check if email already exists in database
-  const existingUser = data.find(user => user.email === email);
+  const existingUser = await getUser(email);
   if (existingUser) {
     return res.status(409).json({
       ok: false,
@@ -94,23 +93,12 @@ router.post("/register", async (req, res) => {
   // Hash password before storing
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // Save user to database
-  const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyLink = `${process.env.FRONTEND_URL}/verify-email?email=${encodeURIComponent(email)}&token=${verifyToken}`;
-
   // Add data to database
-  data.push({ 
-    name, 
-    email, 
-    hashedPassword, 
-    verified: false, 
-    verifyToken,
-  });
+  await createUser(email, hashedPassword);
 
   res.json({
     ok: true,
     message: "Account created successfully",
-    verifyLink, // For coursework, this is OK
   });
 })
 
@@ -124,23 +112,16 @@ router.post("/login", async (req, res) => {
     });
   }
 
-  const user = data.find(u => u.email === email);
+  const user = await getUser(email);
 
-  if (!user) {
+  if (user === null) {
     return res.status(401).json({
       ok: false,
       message: "Invalid email or password.",
     });
   }
 
-  if (!user.verified) {
-    return res.status(403).json({
-      ok: false,
-      message: "Email not verified. Please check your inbox.",
-    });
-  }
-
-  const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
+  const isPasswordValid = await bcrypt.compare(password, user.passkey);
 
   if (!isPasswordValid) {
     return res.status(401).json({
@@ -149,44 +130,32 @@ router.post("/login", async (req, res) => {
     });
   }
 
-  const token = jwt.sign(
-    { email: user.email }, 
-    JWT_SECRET, 
-    { expiresIn: "12h" }
-  );
+  // Create JWT token
+  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "24h" });
+
+  // Send as HTTP-only cookie
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000,
+  });
 
   res.json({
     ok: true,
     message: "Login successful.",
-    token,
   });
 });
 
-
-router.get("/confirm", (req, res) => {
-  const { email, token } = req.query;
-
-  console.log("Backend: received token for confirmation:", token);
-  console.log("Backend: received email for confirmation:", email);
-  console.log("Current users in database:", data);
-
-  const user = data.find(u => u.email === email || u.verifyToken === token);
-
-  if (!user) {
-    return res.status(400).json({
-      ok: false,
-      message: "Invalid or expired token.",
-    });
-  }
-
-  user.verified = true;
-  user.verifyToken = null; // Invalidate token after use
-
+// Logout User
+router.post("/logout", (req, res) => {
+  res.clearCookie("token");
   res.json({
     ok: true,
-    message: "Email verified successfully!",
+    message: "Logged out successfully.",
   });
 });
+
 
 router.get("/me", requireAuth, (req, res) => {
   res.json({

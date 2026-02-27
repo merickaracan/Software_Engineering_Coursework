@@ -12,11 +12,6 @@ async function registerUser(email, password = "Password123!") {
 	});
 }
 
-async function confirmUser(verifyLink) {
-	const token = (verifyLink || "").split("token=")[1];
-	return request(app).get(`/api/confirm?token=${token}`);
-}
-
 describe("Login tests:", () => {
     
 	test("Rejects missing email", async () => {
@@ -39,23 +34,9 @@ describe("Login tests:", () => {
 		expect(res.body.message).toBe("Invalid email or password.");
 	});
 
-	test("Rejects unverified user", async () => {
-		const email = makeEmail("unverified");
-		await registerUser(email);
-
-		const res = await request(app)
-			.post("/api/login")
-			.send({ email, password: "Password123!" });
-
-		expect(res.statusCode).toBe(403);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Email not verified. Please check your inbox.");
-	});
-
 	test("Rejects wrong password", async () => {
 		const email = makeEmail("wrongpw");
 		const registerRes = await registerUser(email, "Password123!");
-		await confirmUser(registerRes.body.verifyLink);
 
 		const res = await request(app)
 			.post("/api/login")
@@ -66,10 +47,9 @@ describe("Login tests:", () => {
 		expect(res.body.message).toBe("Invalid email or password.");
 	});
 
-	test("Logs in verified user and returns token", async () => {
+	test("Logs in user and sets token cookie", async () => {
 		const email = makeEmail("valid");
-		const registerRes = await registerUser(email, "Password123!");
-		await confirmUser(registerRes.body.verifyLink);
+		await registerUser(email, "Password123!");
 
 		const res = await request(app)
 			.post("/api/login")
@@ -78,53 +58,47 @@ describe("Login tests:", () => {
 		expect(res.statusCode).toBe(200);
 		expect(res.body.ok).toBe(true);
 		expect(res.body.message).toBe("Login successful.");
-		expect(typeof res.body.token).toBe("string");
-		expect(res.body.token.length).toBeGreaterThan(10);
+
+		// Check that token is set as HTTP-only cookie
+		const setCookieHeader = res.headers["set-cookie"];
+		expect(setCookieHeader).toBeDefined();
+		expect(setCookieHeader[0]).toContain("token=");
+		expect(setCookieHeader[0]).toContain("HttpOnly");
 	});
 
-	test("Accesses /me with valid token", async () => {
+	test("Accesses /me with valid token cookie", async () => {
 		const email = makeEmail("me");
-		const registerRes = await registerUser(email, "Password123!");
-		await confirmUser(registerRes.body.verifyLink);
+		await registerUser(email, "Password123!");
 
 		const loginRes = await request(app)
 			.post("/api/login")
 			.send({ email, password: "Password123!" });
 
+		// Extract cookie from login response and use it in next request
 		const res = await request(app)
 			.get("/api/me")
-			.set("Authorization", `Bearer ${loginRes.body.token}`);
+			.set("Cookie", loginRes.headers["set-cookie"][0]);
 
 		expect(res.statusCode).toBe(200);
 		expect(res.body.ok).toBe(true);
 		expect(res.body.user.email).toBe(email);
 	});
 
-	test("Rejects /me without authorization header", async () => {
+	test("Rejects /me without token cookie", async () => {
 		const res = await request(app).get("/api/me");
 
 		expect(res.statusCode).toBe(401);
 		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Authorization header missing.");
+		expect(res.body.message).toBe("No token provided. Please log in.");
 	});
 
-	test("Rejects /me with invalid auth format", async () => {
+	test("Rejects /me with invalid token cookie", async () => {
 		const res = await request(app)
 			.get("/api/me")
-			.set("Authorization", "Token abc123");
+			.set("Cookie", "token=invalid.jwt.token");
 
 		expect(res.statusCode).toBe(401);
 		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Invalid authorization format.");
-	});
-
-	test("Rejects /me with invalid token", async () => {
-		const res = await request(app)
-			.get("/api/me")
-			.set("Authorization", "Bearer invalid.token.value");
-
-		expect(res.statusCode).toBe(401);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.error).toBe("Invalid or expired token");
+		expect(res.body.message).toBe("Invalid or expired token.");
 	});
 });

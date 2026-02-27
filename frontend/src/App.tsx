@@ -1,31 +1,74 @@
-// import './styles/App.css'
-//import { useState } from "react";
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
-import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
-import Note from './pages/Note';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { ConfigProvider, theme } from "antd";
+import Leaderboard from "./components/Leaderboard";
+import Modules from "./components/Modules";
 
 function App() {
-  //const [token, useToken] = useState(localStorage.getItem("token"));
-  //const isAuth = !!token
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/me", {
+          method: "GET",
+          credentials: "include",
+        });
+
+        setIsAuthenticated(response.ok);
+      } catch (err) {
+        console.log("Error checking authentication", err);
+        setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Show nothing while checking auth to avoid flashing login page
+  if (isLoading) {
+    return <div style={{ minHeight: "100vh" }}> Loading ... </div>;
+  }
+
+  const { isDark } = useTheme();
 
   return(
-    <Router>
+    <ThemeProvider>
+    <ConfigProvider theme={{algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,}}>
+      <Router>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/notes" element={<Note />} />
+        {isAuthenticated ? (
+          <>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/modules" element={<Modules />} />
+          </>
+        ) : (
+          <>
+            <Route path="/dashboard" element={<Navigate to="/login" />} />
+            <Route path="/profile" element={<Navigate to="/login" />} />
+            <Route path="/leaderboard" element={<Navigate to="/login" />} />
+            <Route path="/modules" element={<Navigate to="/login" />} />
+          </>
+        )}
       </Routes>
     </Router>
-  )
+    </ConfigProvider>
+    </ThemeProvider>
+  );
 }
 
 export default App;

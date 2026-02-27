@@ -12,6 +12,7 @@ import {
   Space,
   message,
 } from "antd";
+import type { Rule } from "antd/es/form";
 import {
   UserOutlined,
   LockOutlined,
@@ -24,20 +25,18 @@ import { useTheme } from "../components/ThemeContext";
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
-const LoginRules = {
+const LoginRules: Record<string, Rule[]> = {
   email: [
       { required: true, message: "Please enter your email." },
       { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
       { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
   ],
+  
   password: [
     { required: true, message: "Please enter your password." },
-    { min: 8, message: "Password must be at least 8 characters." },
-    { pattern: /[a-z]/, message: "Must contain at least one lowercase letter." },
-    { pattern: /[A-Z]/, message: "Must contain at least one uppercase letter." },
-    { pattern: /[0-9]/, message: "Must contain at least one number." },
-    { pattern: /[!@#$%^&*(),.?":{}|<>]/, message: "Must contain at least one symbol." },
+
   ],
+  
 };
 
 interface LoginFormValues {
@@ -200,11 +199,13 @@ const Login = ({ setIsAuthenticated }) => {
                       />
                     </Form.Item>
 
+
                     <Form.Item
                       label="Password"
                       name="password"
                       rules={LoginRules.password}
                     >
+                      
                       <Input.Password
                         prefix={<LockOutlined />}
                         placeholder="Enter your password"

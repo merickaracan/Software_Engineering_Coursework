@@ -5,7 +5,7 @@ import {
   createSuggestion,
   updateSuggestion,
   deleteSuggestion,
-} from "../suggestions";
+} from "../api/suggestions";
 
 // Mock fetch globally
 global.fetch = vi.fn();

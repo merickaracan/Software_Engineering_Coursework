@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createUser, getUser, updateUser, deleteUser } from "../users";
+import { createUser, getUser, updateUser, deleteUser } from "../api/users";
 
 // Mock fetch globally
 global.fetch = vi.fn();

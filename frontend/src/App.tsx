@@ -1,4 +1,3 @@
-// import './styles/App.css'
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from './pages/Login';
@@ -8,6 +7,8 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { ConfigProvider, theme } from "antd";
+import Leaderboard from "./components/Leaderboard";
+import Modules from "./components/Modules";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -35,7 +36,7 @@ function App() {
 
   // Show nothing while checking auth to avoid flashing login page
   if (isLoading) {
-    return <div style={{ minHeight: "100vh" }}></div>;
+    return <div style={{ minHeight: "100vh" }}> Loading ... </div>;
   }
 
   const { isDark } = useTheme();
@@ -48,16 +49,19 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
         <Route path="/register" element={<Register />} />
-
         {isAuthenticated ? (
           <>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/modules" element={<Modules />} />
           </>
         ) : (
           <>
             <Route path="/dashboard" element={<Navigate to="/login" />} />
             <Route path="/profile" element={<Navigate to="/login" />} />
+            <Route path="/leaderboard" element={<Navigate to="/login" />} />
+            <Route path="/modules" element={<Navigate to="/login" />} />
           </>
         )}
       </Routes>

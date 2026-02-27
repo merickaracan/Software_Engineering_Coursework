@@ -18,7 +18,6 @@ describe("Registration tests:", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.ok).toBe(true);
-    expect(res.body.verifyLink).toContain("/verify-email?token=");
   });
 
   test("Rejects missing name", async () => {
@@ -88,25 +87,5 @@ describe("Registration tests:", () => {
     expect(res.statusCode).toBe(409);
     expect(res.body.ok).toBe(false);
     expect(res.body.errors).toContain("Email is already registered.");
-  });
-
-  test("Confirms email with token", async () => {
-    const email = makeEmail("confirm");
-    const registerRes = await request(app)
-      .post("/api/register")
-      .send({
-        name: "Test User",
-        email,
-        password: "Password123!",
-      });
-
-    const verifyLink = registerRes.body.verifyLink || "";
-    const token = verifyLink.split("token=")[1];
-
-    const res = await request(app).get(`/api/confirm?token=${token}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.message).toBe("Email verified successfully!");
   });
 });

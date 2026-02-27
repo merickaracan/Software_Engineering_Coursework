@@ -8,7 +8,7 @@ import {
   verifyNote,
   unverifyNote,
   deleteNote,
-} from "../notes";
+} from "../api/notes";
 
 // Mock fetch globally
 global.fetch = vi.fn();

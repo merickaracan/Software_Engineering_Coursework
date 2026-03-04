@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { ConfigProvider, theme } from "antd";
-import Leaderboard from "./components/Leaderboard";
-import Modules from "./components/Modules";
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
+import LeaderboardPage from './pages/LeaderboardPage';
+import MyNotesPage from './pages/MyNotesPage';
+import ModulesPage from './pages/ModulesPage';
+import CreateNotePage from './pages/CreateNotePage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -39,7 +42,6 @@ function App() {
     return <div style={{ minHeight: "100vh" }}> Loading ... </div>;
   }
 
-  const { isDark } = useTheme();
 
   return(
     <ThemeProvider>
@@ -53,15 +55,19 @@ function App() {
           <>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/modules" element={<Modules />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/my-notes" element={<MyNotesPage />} />
+            <Route path="/modules" element={<ModulesPage />} />
+            <Route path="/create-note" element={<CreateNotePage />} />
           </>
         ) : (
           <>
             <Route path="/dashboard" element={<Navigate to="/login" />} />
             <Route path="/profile" element={<Navigate to="/login" />} />
             <Route path="/leaderboard" element={<Navigate to="/login" />} />
+            <Route path="/my-notes" element={<Navigate to="/login" />} />
             <Route path="/modules" element={<Navigate to="/login" />} />
+            <Route path="/create-note" element={<Navigate to="/login" />} />
           </>
         )}
       </Routes>

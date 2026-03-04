@@ -123,6 +123,7 @@ const Login = ({ setIsAuthenticated }) => {
                   bordered={false}
                   style={{
                     height: "100%",
+                    minHeight: 500,
                     background:
                       "linear-gradient(145deg, #0b5ed7 0%, #1d74f5 40%, #3a8bff 100%)",
                     color: "#fff",
@@ -131,14 +132,15 @@ const Login = ({ setIsAuthenticated }) => {
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
+                    alignItems: "center",
                     height: "100%",
                     padding: "32px",
                   }}
                 >
-                  <Title level={2} style={{ color: "#fff", marginBottom: 16 }}>
-                    Welcome to Notebuddy 
+                  <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
+                    Welcome to Notebuddy
                   </Title>
-                  <Text style={{ color: "#dbe8ff", fontSize: 14 }}>
+                  <Text style={{ color: "#dbe8ff", fontSize: 14, textAlign: "center" }}>
                     Log in to access your workspace, track your notes, and
                     continue where you left off.
                   </Text>
@@ -158,11 +160,12 @@ const Login = ({ setIsAuthenticated }) => {
                   bordered={false}
                   style={{
                     borderRadius: 16,
+                    minHeight: 500,
                     boxShadow:
                       "0 18px 40px rgba(15, 35, 95, 0.18)",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px" }}
+                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
                   <Space
                     direction="vertical"
@@ -171,7 +174,7 @@ const Login = ({ setIsAuthenticated }) => {
                   >
                     <Title
                       level={3}
-                      style={{ margin: 0, color: "#1f2933", textAlign: "center" }}
+                      style={{ margin: 0, color: isDark ? "#fff" : "#1f2933", textAlign: "center" }}
                     >
                       Login
                     </Title>

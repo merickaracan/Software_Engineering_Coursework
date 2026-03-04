@@ -148,14 +148,15 @@ const Register: React.FC = () => {
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
+                    alignItems: "center",
                     height: "100%",
                     padding: "32px",
                   }}
                 >
-                  <Title level={2} style={{ color: "#fff", marginBottom: 16 }}>
+                  <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
                     Create your account
                   </Title>
-                  <Text style={{ color: "#dbe8ff", fontSize: 14 }}>
+                  <Text style={{ color: "#dbe8ff", fontSize: 14, textAlign: "center" }}>
                     Sign up to start sharing your notes and contributing to your
                     peers.
                   </Text>
@@ -169,9 +170,9 @@ const Register: React.FC = () => {
                   style={{
                     borderRadius: 16,
                     boxShadow: "0 18px 40px rgba(15, 35, 95, 0.18)",
-                    backgroundColor: "#ffffff",
+                    backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px" }}
+                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
                 >
                   <Space
                     direction="vertical"
@@ -182,7 +183,7 @@ const Register: React.FC = () => {
                       level={3}
                       style={{
                         margin: 0,
-                        color: "#1f2933",
+                        color: isDark ? "#fff" : "#1f2933",
                         textAlign: "center",
                       }}
                     >

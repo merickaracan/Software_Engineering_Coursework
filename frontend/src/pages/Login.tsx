@@ -21,6 +21,7 @@ import {
   MoonOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "../components/ThemeContext";
+import { getUserByEmail } from "../api/auth";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -69,20 +70,46 @@ const Login = ({ setIsAuthenticated }) => {
       return;
     }
 
-    // Set authentication state if callback provided
-    if (setIsAuthenticated) {
-      setIsAuthenticated(true);
+    try {
+      // Fetch user details to get the name and ID
+      const userResponse = await getUserByEmail(values.email);
+      const userName = userResponse.ok && userResponse.data && userResponse.data.length > 0 
+        ? userResponse.data[0].name 
+        : values.email;
+      const userId = userResponse.ok && userResponse.data && userResponse.data.length > 0 
+        ? userResponse.data[0].id 
+        : null;
+
+      // Set authentication state if callback provided
+      if (setIsAuthenticated) {
+        setIsAuthenticated(true);
+      }
+
+      localStorage.setItem("user", JSON.stringify({
+        email: values.email,
+        name: userName,
+        id: userId,
+      }));
+
+      message.success("Logged in successfully");
+      setLoading(false);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+      // Still log in even if we can't fetch user details
+      localStorage.setItem("user", JSON.stringify({
+        email: values.email,
+        name: values.email,
+        id: null,
+      }));
+      message.success("Logged in successfully");
+      setLoading(false);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1000);
     }
-
-    localStorage.setItem("user", JSON.stringify({
-      email: values.email,
-    }));
-
-    message.success("Logged in successfully");
-    setLoading(false);
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1000);
   };
 
   const onFinishFailed = () => {

@@ -23,10 +23,12 @@ const cloudConnection = mysql.createPool({
 });
 
 const cloudDb = cloudConnection.promise();
-if (cloudConnection) {
-  console.log("✅ Connected to cloud database");
-}
 let isCloudConnected = false;
+if (cloudConnection && isCloudConnected) {
+  console.log("✅ Connected to cloud database");
+} else {
+  console.warn("⚠️  Using local SQLite fallback");
+}
 
 /**
  * Database wrapper with automatic failover [for development only]

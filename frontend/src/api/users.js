@@ -87,6 +87,33 @@ const updateUser = async (email, name=null, passwordHash=null, isLecturer=null, 
 }
 
 /**
+ * Updates a user's profile picture
+ * @param {string} email - User's email address
+ * @param {string|null} profilePicture - Base64 data URL for image (or null to clear)
+ * @returns {Promise<Object>} Response data from server
+ * @throws {Error} If the request fails
+ */
+const updateProfilePicture = async (email, profilePicture = null) => {
+    try {
+        const response = await fetch(`/api/users/${email}/profile-picture`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+                profile_picture: profilePicture,
+            }),
+        });
+        const data = await response.json();
+        return data;
+    } catch (err) {
+        console.error("Error updating profile picture:", err);
+        throw err;
+    }
+};
+
+/**
  * Deletes a user from the database
  * @param {string} email - User's email address
  * @returns {Promise<Object>} Response data from server
@@ -109,4 +136,4 @@ const deleteUser = async (email) => {
     }
 }
 
-export { createUser, getUser, updateUser, deleteUser };
+export { createUser, getUser, updateUser, updateProfilePicture, deleteUser };

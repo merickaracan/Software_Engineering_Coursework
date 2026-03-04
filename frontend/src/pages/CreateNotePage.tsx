@@ -72,12 +72,25 @@ const CreateNotePage: React.FC = () => {
         return;
       }
 
+      // Convert file to base64 if provided
+      let fileData: any = null;
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const base64 = await fileToBase64(fileList[0].originFileObj);
+        fileData = {
+          name: fileList[0].name,
+          type: fileList[0].type || 'application/octet-stream',
+          size: fileList[0].size || 0,
+          data: base64
+        };
+      }
+
       // Call backend API to create note
       const response = await createNote(
         currentUser.email,
         title.trim(),
         description.trim(),
-        module
+        module,
+        fileData
       );
       
       if (!response.ok) {
@@ -91,6 +104,16 @@ const CreateNotePage: React.FC = () => {
       console.error("Error creating note:", error);
       message.error("Failed to create note. Please try again.");
     }
+  };
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   };
 
   return (
@@ -144,12 +167,19 @@ const CreateNotePage: React.FC = () => {
 
             {/* File upload area */}
             <Card style={cardStyle}>
-              <Text strong style={{ display: "block", marginBottom: 12 }}>Upload Files</Text>
+              <Text strong style={{ display: "block", marginBottom: 12 }}>Upload File (Optional)</Text>
               <Dragger
-                multiple
+                maxCount={1}
                 fileList={fileList}
                 onChange={({ fileList: newFileList }) => setFileList(newFileList)}
-                beforeUpload={() => false}
+                beforeUpload={(file) => {
+                  const maxSize = 10 * 1024 * 1024; // 10MB limit
+                  if (file.size > maxSize) {
+                    message.error(`${file.name} is too large. Maximum file size is 10MB.`);
+                    return false;
+                  }
+                  return false; // Prevent auto upload
+                }}
                 style={{
                   borderRadius: 12,
                   background: isDark ? "#141414" : "#fafafa",
@@ -160,10 +190,10 @@ const CreateNotePage: React.FC = () => {
                   <InboxOutlined />
                 </p>
                 <p style={{ fontSize: 15, fontWeight: 500 }}>
-                  Click or drag files to upload
+                  Click or drag file to upload
                 </p>
                 <p style={{ fontSize: 13, color: "#999" }}>
-                  Supports PDF, DOCX, images, and other file types
+                  Supports PDF, DOCX, images, and other file types (max 10MB)
                 </p>
               </Dragger>
             </Card>

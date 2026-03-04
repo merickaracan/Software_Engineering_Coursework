@@ -11,6 +11,7 @@ import {
   Button,
   Space,
   Select,
+  Checkbox,
   message,
 } from "antd";
 import {
@@ -100,6 +101,7 @@ interface RegisterFormValues {
   major: string;
   password: string;
   confirmPassword: string;
+  is_lecturer?: boolean;
 }
 
 const Register: React.FC = () => {
@@ -108,12 +110,17 @@ const Register: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
 
   const onFinish = async (values: RegisterFormValues) => {
-    const { name, email, password } = values;
+    const { name, email, password, is_lecturer } = values;
 
     const request = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        is_lecturer: Boolean(is_lecturer),
+      }),
     });
 
     const data = await request.json();
@@ -314,6 +321,12 @@ const Register: React.FC = () => {
                           onVisibleChange: setPasswordVisible,
                         }}
                       />
+                    </Form.Item>
+
+                    <Form.Item name="is_lecturer" valuePropName="checked" style={{ marginBottom: 16 }}>
+                      <Checkbox>
+                        I am a lecturer
+                      </Checkbox>
                     </Form.Item>
 
                     <Form.Item style={{ marginBottom: 8 }}>

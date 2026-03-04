@@ -1,6 +1,30 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const requireAuth = require("../middleware/requireAuth");
+
+router.get("/search", async (req, res) => {
+    try {
+        const { title, author } = req.query;
+        let query = "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE 1=1";
+        const params = [];
+
+        if (title) {
+            query += " AND notes.title LIKE ?";
+            params.push(`%${title}%`);
+        }
+
+        if (author) {
+            query += " AND user_data.email LIKE ?";
+            params.push(`%${author}%`);
+        }
+
+        const [rows] = await db.query(query, params);
+        res.status(200).json({ ok: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
 
 router.get("/notes/:id",async (req,res) =>{
     try{
@@ -48,7 +72,7 @@ router.get("/notes/email/:email",async (req,res) =>{
 
 router.post("/notes",async (req,res) =>{
     try{
-        const {owner_email,title,note_data,module} = req.body;
+        const {owner_email,title,note_data,module,file} = req.body;
         
         // Look up owner_id from email
         const [userRows] = await db.query("SELECT id FROM user_data WHERE email = ?",[owner_email]);
@@ -57,7 +81,21 @@ router.post("/notes",async (req,res) =>{
         }
         const owner_id = userRows[0].id;
         
-        const [result] = await db.query("INSERT INTO notes (owner_id, title, note_data, module) VALUES (?, ?, ?, ?)",[owner_id, title, note_data, module]);
+        // Insert note with optional file data
+        const [result] = await db.query(
+            "INSERT INTO notes (owner_id, title, note_data, module, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                owner_id, 
+                title, 
+                note_data, 
+                module,
+                file?.name || null,
+                file?.type || null,
+                file?.size || 0,
+                file?.data || null
+            ]
+        );
+
         return res.status(201).json({
             ok: true,
             message: "Note created",
@@ -85,8 +123,20 @@ router.delete("/notes/:id", async (req,res) =>{
 
 router.put("/notes/:id", async (req,res) =>{
     try{
-        const {title, note_data,module} = req.body;
-        const [result] = await db.query("UPDATE notes SET title = ?, note_data = ?, module = ?, updated_at = datetime('now') WHERE id = ?",[title, note_data,module,req.params.id]);
+        const {title, note_data, module, file} = req.body;
+        const [result] = await db.query(
+            "UPDATE notes SET title = ?, note_data = ?, module = ?, file_name = ?, file_type = ?, file_size = ?, file_data = ?, updated_at = datetime('now') WHERE id = ?",
+            [
+                title, 
+                note_data, 
+                module,
+                file?.name || null,
+                file?.type || null,
+                file?.size || 0,
+                file?.data || null,
+                req.params.id
+            ]
+        );
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Note not found" });
         }
@@ -97,8 +147,13 @@ router.put("/notes/:id", async (req,res) =>{
     }
 });
 
-router.put("/notes/verify/:id", async (req,res) =>{
+router.put("/notes/verify/:id", requireAuth, async (req,res) =>{
     try{
+        const [userRows] = await db.query("SELECT is_lecturer FROM user_data WHERE email = ?", [req.user.email]);
+        if (!userRows.length || userRows[0].is_lecturer !== 1) {
+            return res.status(403).json({ ok: false, error: "Only lecturers can verify notes" });
+        }
+
         const [result] = await db.query("UPDATE notes SET is_verified = ? WHERE id = ?",[1,req.params.id]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Note not found" });
@@ -110,8 +165,13 @@ router.put("/notes/verify/:id", async (req,res) =>{
     }
 });
 
-router.put("/notes/unverify/:id", async (req,res) =>{
+router.put("/notes/unverify/:id", requireAuth, async (req,res) =>{
     try{
+        const [userRows] = await db.query("SELECT is_lecturer FROM user_data WHERE email = ?", [req.user.email]);
+        if (!userRows.length || userRows[0].is_lecturer !== 1) {
+            return res.status(403).json({ ok: false, error: "Only lecturers can unverify notes" });
+        }
+
         const [result] = await db.query("UPDATE notes SET is_verified = ? WHERE id = ?",[0,req.params.id]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Note not found" });

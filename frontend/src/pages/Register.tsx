@@ -10,6 +10,7 @@ import {
   Input,
   Button,
   Space,
+  Select,
   message,
 } from "antd";
 import {
@@ -19,12 +20,48 @@ import {
   CheckCircleOutlined,
   SunOutlined,
   MoonOutlined,
+  BookOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "../components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
+const BATH_MAJORS = [
+  // Faculty of Engineering & Design
+  { value: "Architecture", label: "Architecture" },
+  { value: "Chemical Engineering", label: "Chemical Engineering" },
+  { value: "Civil Engineering", label: "Civil Engineering" },
+  { value: "Computer Science", label: "Computer Science" },
+  { value: "Electronic & Electrical Engineering", label: "Electronic & Electrical Engineering" },
+  { value: "Integrated Mechanical & Electrical Engineering", label: "Integrated Mechanical & Electrical Engineering" },
+  { value: "Mechanical Engineering", label: "Mechanical Engineering" },
+  { value: "Product Design & Management", label: "Product Design & Management" },
+  // Faculty of Humanities & Social Sciences
+  { value: "Economics", label: "Economics" },
+  { value: "Education", label: "Education" },
+  { value: "Modern Languages & European Studies", label: "Modern Languages & European Studies" },
+  { value: "Politics, Languages & International Studies", label: "Politics, Languages & International Studies" },
+  { value: "Psychology", label: "Psychology" },
+  { value: "Social Policy", label: "Social Policy" },
+  { value: "Sociology", label: "Sociology" },
+  // Faculty of Science
+  { value: "Biochemistry", label: "Biochemistry" },
+  { value: "Biology", label: "Biology" },
+  { value: "Chemistry", label: "Chemistry" },
+  { value: "Mathematics", label: "Mathematics" },
+  { value: "Natural Sciences", label: "Natural Sciences" },
+  { value: "Pharmacy & Pharmacology", label: "Pharmacy & Pharmacology" },
+  { value: "Physics", label: "Physics" },
+  { value: "Statistics", label: "Statistics" },
+  // School of Management
+  { value: "Accounting & Finance", label: "Accounting & Finance" },
+  { value: "Business Administration", label: "Business Administration" },
+  { value: "Management", label: "Management" },
+  // Other
+  { value: "Sports & Exercise Science", label: "Sports & Exercise Science" },
+  { value: "Nursing", label: "Nursing" },
+];
 const RegistrationRules = {
   name: [
     { required: true, message: "Please enter your name." },
@@ -60,6 +97,7 @@ const RegistrationRules = {
 interface RegisterFormValues {
   name: string;
   email: string;
+  major: string;
   password: string;
   confirmPassword: string;
 }
@@ -225,6 +263,21 @@ const Register: React.FC = () => {
                         prefix={<MailOutlined />}
                         placeholder="ab1234@bath.ac.uk"
                         size="large"
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="Major"
+                      name="major"
+                      rules={[{ required: true, message: "Please select your major." }]}
+                    >
+                      <Select
+                        placeholder="Select your major"
+                        size="large"
+                        showSearch
+                        optionFilterProp="label"
+                        suffixIcon={<BookOutlined />}
+                        options={BATH_MAJORS}
                       />
                     </Form.Item>
 

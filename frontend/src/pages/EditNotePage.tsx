@@ -1,20 +1,22 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Layout,
   Typography,
   Card,
   Input,
   Button,
-  Upload,
   Select,
+  Upload,
   message,
   Row,
   Col,
+  Result,
+  Empty,
 } from "antd";
 import {
-  UploadOutlined,
-  FileAddOutlined,
+  SaveOutlined,
+  ArrowLeftOutlined,
   InboxOutlined,
 } from "@ant-design/icons";
 import type { UploadFile } from "antd";
@@ -35,23 +37,58 @@ const MODULES = [
   { value: "ai", label: "Artificial Intelligence" },
 ];
 
-const CreateNotePage: React.FC = () => {
-  const { isDark } = useTheme();
+interface Note {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  files: string[];
+  createdAt: string;
+  ownerEmail: string;
+}
+
+const EditNotePage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isDark } = useTheme();
+
+  const [note, setNote] = useState<Note | null | undefined>(undefined);
+  const [isOwner, setIsOwner] = useState(false);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [module, setModule] = useState<string | undefined>(undefined);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
 
-  const cardStyle: React.CSSProperties = {
-    borderRadius: 12,
-    boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
-    border: isDark ? "1px solid #303030" : undefined,
-    background: isDark ? "#1f1f1f" : "#fff",
-    marginBottom: 24,
-  };
+  useEffect(() => {
+    const stored = localStorage.getItem("myNotes");
+    const notes: Note[] = stored ? JSON.parse(stored) : [];
+    const found = notes.find((n) => n.id === id) ?? null;
+    setNote(found);
 
-  const handleSubmit = () => {
+    if (found) {
+      const storedUser = localStorage.getItem("user");
+      const currentUser = storedUser ? JSON.parse(storedUser) : null;
+      // If ownerEmail is absent (note predates ownership feature), any logged-in user can edit
+      const owns = !found.ownerEmail || currentUser?.email === found.ownerEmail;
+      setIsOwner(owns);
+
+      if (owns) {
+        setTitle(found.title);
+        setDescription(found.description);
+        setModule(found.module);
+        setFileList(
+          found.files.map((name, i) => ({
+            uid: String(i),
+            name,
+            status: "done" as const,
+          }))
+        );
+      }
+    }
+  }, [id]);
+
+  const handleSave = () => {
     if (!title.trim()) {
       message.error("Please enter a note title.");
       return;
@@ -61,27 +98,77 @@ const CreateNotePage: React.FC = () => {
       return;
     }
 
-    const storedUser = localStorage.getItem("user");
-    const currentUser = storedUser ? JSON.parse(storedUser) : null;
-
-    const note = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
-      module,
-      files: fileList.map((f) => f.name),
-      createdAt: new Date().toISOString(),
-      ownerEmail: currentUser?.email ?? "",
-    };
-
     const stored = localStorage.getItem("myNotes");
-    const notes = stored ? JSON.parse(stored) : [];
-    notes.push(note);
-    localStorage.setItem("myNotes", JSON.stringify(notes));
-
-    message.success("Note created successfully!");
-    setTimeout(() => navigate("/my-notes"), 500);
+    const notes: Note[] = stored ? JSON.parse(stored) : [];
+    const updated = notes.map((n) =>
+      n.id === id
+        ? {
+            ...n,
+            title: title.trim(),
+            description: description.trim(),
+            module,
+            files: fileList.map((f) => f.name),
+          }
+        : n
+    );
+    localStorage.setItem("myNotes", JSON.stringify(updated));
+    message.success("Note updated successfully!");
+    setTimeout(() => navigate(`/note/${id}`), 400);
   };
+
+  const cardStyle: React.CSSProperties = {
+    borderRadius: 12,
+    boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+    border: isDark ? "1px solid #303030" : undefined,
+    background: isDark ? "#1f1f1f" : "#fff",
+    marginBottom: 24,
+  };
+
+  // Loading state
+  if (note === undefined) return null;
+
+  // Note not found
+  if (note === null) {
+    return (
+      <PageLayout>
+        <Content style={{ padding: "32px" }}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate("/my-notes")}
+            style={{ marginBottom: 24, borderRadius: 8 }}
+          >
+            Back to My Notes
+          </Button>
+          <Empty description="Note not found." />
+        </Content>
+      </PageLayout>
+    );
+  }
+
+  // Not the owner
+  if (!isOwner) {
+    return (
+      <PageLayout>
+        <Content style={{ padding: "32px" }}>
+          <Result
+            status="403"
+            title="Access Denied"
+            subTitle="You don't have permission to edit this note."
+            extra={
+              <Button
+                type="primary"
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate(`/note/${id}`)}
+                style={{ backgroundColor: isDark ? "#4da3ff" : "#0b5ed7", borderRadius: 8 }}
+              >
+                Back to Note
+              </Button>
+            }
+          />
+        </Content>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout>
@@ -89,11 +176,16 @@ const CreateNotePage: React.FC = () => {
         <Row justify="center">
           <Col xs={24} md={20} lg={16}>
             <Row align="middle" style={{ marginBottom: 24 }}>
-              <FileAddOutlined style={{ fontSize: 28, color: isDark ? "#4da3ff" : "#0b5ed7", marginRight: 12 }} />
-              <Title level={2} style={{ margin: 0 }}>Create Note</Title>
+              <Button
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate(`/note/${id}`)}
+                style={{ marginRight: 16, borderRadius: 8 }}
+              >
+                Cancel
+              </Button>
+              <Title level={2} style={{ margin: 0 }}>Edit Note</Title>
             </Row>
 
-            {/* Note details */}
             <Card style={cardStyle}>
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <div>
@@ -132,7 +224,6 @@ const CreateNotePage: React.FC = () => {
               </div>
             </Card>
 
-            {/* File upload area */}
             <Card style={cardStyle}>
               <Text strong style={{ display: "block", marginBottom: 12 }}>Upload Files</Text>
               <Dragger
@@ -158,15 +249,14 @@ const CreateNotePage: React.FC = () => {
               </Dragger>
             </Card>
 
-            {/* Actions */}
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={12}>
                 <Button
                   type="primary"
                   size="large"
-                  icon={<UploadOutlined />}
+                  icon={<SaveOutlined />}
                   block
-                  onClick={handleSubmit}
+                  onClick={handleSave}
                   style={{
                     backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
                     borderColor: isDark ? "#4da3ff" : "#0b5ed7",
@@ -174,14 +264,14 @@ const CreateNotePage: React.FC = () => {
                     height: 48,
                   }}
                 >
-                  Create Note
+                  Save Changes
                 </Button>
               </Col>
               <Col xs={24} sm={12}>
                 <Button
                   size="large"
                   block
-                  onClick={() => navigate("/my-notes")}
+                  onClick={() => navigate(`/note/${id}`)}
                   style={{ borderRadius: 8, height: 48 }}
                 >
                   Cancel
@@ -195,4 +285,4 @@ const CreateNotePage: React.FC = () => {
   );
 };
 
-export default CreateNotePage;
+export default EditNotePage;

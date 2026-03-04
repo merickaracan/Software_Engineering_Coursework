@@ -11,8 +11,10 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import MyNotesPage from './pages/MyNotesPage';
 import ModulesPage from './pages/ModulesPage';
 import CreateNotePage from './pages/CreateNotePage';
+import NoteDetailPage from './pages/NoteDetailPage';
+import EditNotePage from './pages/EditNotePage';
 
-function App() {
+function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { isDark } = useTheme();
@@ -42,9 +44,7 @@ function App() {
     return <div style={{ minHeight: "100vh" }}> Loading ... </div>;
   }
 
-
-  return(
-    <ThemeProvider>
+  return (
     <ConfigProvider theme={{algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,}}>
       <Router>
       <Routes>
@@ -59,6 +59,8 @@ function App() {
             <Route path="/my-notes" element={<MyNotesPage />} />
             <Route path="/modules" element={<ModulesPage />} />
             <Route path="/create-note" element={<CreateNotePage />} />
+            <Route path="/note/:id" element={<NoteDetailPage />} />
+            <Route path="/note/:id/edit" element={<EditNotePage />} />
           </>
         ) : (
           <>
@@ -68,11 +70,20 @@ function App() {
             <Route path="/my-notes" element={<Navigate to="/login" />} />
             <Route path="/modules" element={<Navigate to="/login" />} />
             <Route path="/create-note" element={<Navigate to="/login" />} />
+            <Route path="/note/:id" element={<Navigate to="/login" />} />
+            <Route path="/note/:id/edit" element={<Navigate to="/login" />} />
           </>
         )}
       </Routes>
     </Router>
     </ConfigProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
     </ThemeProvider>
   );
 }

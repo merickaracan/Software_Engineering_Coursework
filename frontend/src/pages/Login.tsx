@@ -19,7 +19,7 @@ import {
   SunOutlined,
   MoonOutlined,
 } from "@ant-design/icons";
-import { useTheme } from "../Components/ThemeContext";
+import { useTheme } from "../components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;

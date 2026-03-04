@@ -15,9 +15,9 @@ import {
   SunOutlined,
   MoonOutlined,
 } from "@ant-design/icons";
-import Leaderboard from "../Components/Leaderboard";
-import Modules from "../Components/Modules";
-import { useTheme } from "../Components/ThemeContext";
+import Leaderboard from "../components/Leaderboard";
+import Modules from "../components/Modules";
+import { useTheme } from "../components/ThemeContext";
 
 const { Title, Text } = Typography;
 const { Header, Content } = Layout;

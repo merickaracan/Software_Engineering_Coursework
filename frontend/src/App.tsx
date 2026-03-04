@@ -5,6 +5,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import LeaderboardPage from './pages/LeaderboardPage';
+import MyNotesPage from './pages/MyNotesPage';
+import ModulesPage from './pages/ModulesPage';
+import CreateNotePage from './pages/CreateNotePage';
 
 function AppRoutes() {
   const { isDark } = useTheme();
@@ -21,6 +25,10 @@ function AppRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/my-notes" element={<MyNotesPage />} />
+          <Route path="/modules" element={<ModulesPage />} />
+          <Route path="/create-note" element={<CreateNotePage />} />
           <Route path = "/" element={<Navigate to="/login"/>} />
         </Routes>
       </Router>

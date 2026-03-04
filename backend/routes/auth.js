@@ -94,7 +94,7 @@ router.post("/register", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 12);
 
   // Add data to database
-  await createUser(email, hashedPassword);
+  await createUser(email, name, hashedPassword);
 
   res.json({
     ok: true,
@@ -121,7 +121,7 @@ router.post("/login", async (req, res) => {
     });
   }
 
-  const isPasswordValid = await bcrypt.compare(password, user.passkey);
+  const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isPasswordValid) {
     return res.status(401).json({

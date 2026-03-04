@@ -17,9 +17,11 @@ describe("userService", () => {
     it("should fetch a user by email", async () => {
       const email = "user@bath.ac.uk";
       const mockUser = {
+        id: 1,
+        name: "Test User",
         email,
-        passkey: "hashed_password",
-        lecturer: 0,
+        password_hash: "hashed_password",
+        is_lecturer: 0,
         points: 100,
       };
 
@@ -53,38 +55,40 @@ describe("userService", () => {
   describe("createUser", () => {
     it("should create a user with default values", async () => {
       const email = "newuser@bath.ac.uk";
-      const passkey = "hashed_password";
+      const name = "New User";
+      const password_hash = "hashed_password";
 
       db.query.mockResolvedValueOnce([{ insertId: 1 }]);
 
-      const result = await createUser(email, passkey);
+      const result = await createUser(email, name, password_hash);
 
       expect(result).toEqual({ insertId: 1 });
       expect(db.query).toHaveBeenCalledWith(
-        "INSERT INTO user_data (email, passkey, lecturer, points) VALUES (?, ?, ?, ?)",
-        [email, passkey, 0, 0]
+        "INSERT INTO user_data (email, name, password_hash, is_lecturer, points) VALUES (?, ?, ?, ?, ?)",
+        [email, name, password_hash, 0, 0]
       );
     });
 
     it("should create a user with custom values", async () => {
       const email = "lecturer@bath.ac.uk";
-      const passkey = "hashed_password";
+      const name = "Lecturer User";
+      const password_hash = "hashed_password";
 
       db.query.mockResolvedValueOnce([{ insertId: 2 }]);
 
-      const result = await createUser(email, passkey, 1, 500);
+      const result = await createUser(email, name, password_hash, 1, 500);
 
       expect(result).toEqual({ insertId: 2 });
       expect(db.query).toHaveBeenCalledWith(
-        "INSERT INTO user_data (email, passkey, lecturer, points) VALUES (?, ?, ?, ?)",
-        [email, passkey, 1, 500]
+        "INSERT INTO user_data (email, name, password_hash, is_lecturer, points) VALUES (?, ?, ?, ?, ?)",
+        [email, name, password_hash, 1, 500]
       );
     });
 
     it("should throw error on duplicate email", async () => {
       db.query.mockRejectedValueOnce(new Error("Duplicate entry"));
 
-      await expect(createUser("user@bath.ac.uk", "password")).rejects.toThrow(
+      await expect(createUser("user@bath.ac.uk", "Test User", "password")).rejects.toThrow(
         "Error creating user: Duplicate entry"
       );
     });
@@ -96,12 +100,12 @@ describe("userService", () => {
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await updateUser(email, "new_password", 1, 200);
+      const result = await updateUser(email, "Updated Name", "new_password", 1, 200);
 
       expect(result).toEqual({ affectedRows: 1 });
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",
-        ["new_password", 1, 200, email]
+        "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
+        ["Updated Name", "new_password", 1, 200, email]
       );
     });
 
@@ -110,12 +114,12 @@ describe("userService", () => {
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await updateUser(email, null, 1, null);
+      const result = await updateUser(email, null, null, 1, null);
 
       expect(result).toEqual({ affectedRows: 1 });
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",
-        [null, 1, null, email]
+        "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
+        [null, null, 1, null, email]
       );
     });
 

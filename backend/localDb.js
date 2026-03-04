@@ -4,104 +4,217 @@ const path = require("path");
 // Create/connect to local SQLite database
 const dbPath = path.join(__dirname, "local.db");
 
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error("Error opening local database:", err.message);
-    } else {
-        console.log("Connected to local SQLite database at:", dbPath);
-        initializeLocalDatabase();
-    }
+let db;
+let dbReady = false;
+
+const dbReadyPromise = new Promise((resolve, reject) => {
+    db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error("Error opening local database:", err.message);
+            reject(err);
+        } else {
+            console.log("Connected to local SQLite database at:", dbPath);
+            initializeLocalDatabase()
+                .then(() => {
+                    dbReady = true;
+                    resolve();
+                })
+                .catch(reject);
+        }
+    });
 });
 
 /**
  * Initialize local database with tables if they don't exist
+ * Returns a promise that resolves when all tables and indexes are created
  */
 function initializeLocalDatabase() {
-    db.serialize(() => {
-        // Create user_data table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS user_data (
-                email TEXT PRIMARY KEY,
-                lecturer INTEGER NOT NULL DEFAULT 0 CHECK (lecturer IN (0,1)),
-                points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
-                passkey TEXT NOT NULL
-            )
-        `);
+    return new Promise((resolve, reject) => {
+        db.serialize(() => {
+            let completed = 0;
+            const total = 8; // 4 tables + 4 indexes
 
-        // Create notes table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS notes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                owner_email TEXT NOT NULL,
-                is_verified INTEGER NOT NULL DEFAULT 0 CHECK (is_verified IN (0,1)),
-                note_data TEXT NOT NULL,
-                module TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                FOREIGN KEY (owner_email) REFERENCES user_data(email) ON DELETE CASCADE
-            )
-        `);
+            const checkCompletion = () => {
+                completed++;
+                if (completed === total) {
+                    console.log("Local database tables and indexes initialized");
+                    resolve();
+                }
+            };
 
-        // Create suggestions table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS suggestions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                note_id INTEGER NOT NULL,
-                commenter_email TEXT NOT NULL,
-                suggestion_data TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
-                FOREIGN KEY (commenter_email) REFERENCES user_data(email) ON DELETE CASCADE
-            )
-        `);
+            // Create user_data table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS user_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE,
+                    is_lecturer INTEGER NOT NULL DEFAULT 0 CHECK (is_lecturer IN (0,1)),
+                    points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
+                    password_hash TEXT NOT NULL
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
 
-        // Create note_ratings table
-        db.run(`
-            CREATE TABLE IF NOT EXISTS note_ratings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                note_id INTEGER NOT NULL,
-                rater_email TEXT NOT NULL,
-                rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-                UNIQUE(note_id, rater_email),
-                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
-                FOREIGN KEY (rater_email) REFERENCES user_data(email) ON DELETE CASCADE
-            )
-        `);
+            // Create notes table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    owner_id INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    is_verified INTEGER NOT NULL DEFAULT 0 CHECK (is_verified IN (0,1)),
+                    note_data TEXT NOT NULL,
+                    module TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (owner_id) REFERENCES user_data(id) ON DELETE CASCADE
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
 
-        console.log("Local database tables initialized");
+            // Create suggestions table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS suggestions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    note_id INTEGER NOT NULL,
+                    commenter_id INTEGER NOT NULL,
+                    suggestion_data TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (commenter_id) REFERENCES user_data(id) ON DELETE CASCADE
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+
+            // Create note_ratings table
+            db.run(`
+                CREATE TABLE IF NOT EXISTS note_ratings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    note_id INTEGER NOT NULL,
+                    rater_id INTEGER NOT NULL,
+                    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                    UNIQUE(note_id, rater_id),
+                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (rater_id) REFERENCES user_data(id) ON DELETE CASCADE
+                )
+            `, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+
+            // Create indexes for foreign keys and frequently queried columns
+            db.run(`CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner_id);`, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+
+            db.run(`CREATE INDEX IF NOT EXISTS idx_notes_module ON notes(module)`, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+
+            db.run(`CREATE INDEX IF NOT EXISTS idx_suggestions_note ON suggestions(note_id)`, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+
+            db.run(`CREATE INDEX IF NOT EXISTS idx_suggestions_commenter ON suggestions(commenter_id)`, (err) => {
+                if (err) reject(err);
+                else checkCompletion();
+            });
+        });
     });
 }
 
 /**
- * Promisifies sqlite3 query for consistency with mysql2/promise
+ * Validates JSON data fields
+ * @param {string} data - JSON string to validate
+ * @param {string} fieldName - Name of field for error messages
+ * @throws {Error} if JSON is invalid
+ */
+function validateJSONData(data, fieldName = "data") {
+    try {
+        JSON.parse(data);
+    } catch (e) {
+        throw new Error(`Invalid JSON in ${fieldName}: ${e.message}`);
+    }
+}
+
+/**
+ * Promisifies sqlite3 query with proper parameter binding and error context
  * Returns [rows, metadata] like mysql2/promise
+ * @param {string} sql - SQL query string
+ * @param {Array} params - Query parameters for prepared statement
+ * @returns {Promise<Array>} [rows, metadata]
  */
 function promisifyQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
-        if (sql.trim().toUpperCase().startsWith("SELECT")) {
+        // Ensure database is ready
+        if (!dbReady) {
+            return reject(new Error("Database not yet initialized"));
+        }
+
+        const trimmedSql = sql.trim().toUpperCase();
+        const isSelect = trimmedSql.startsWith("SELECT");
+
+        // Use prepared statements with parameter binding for safety
+        if (isSelect) {
             db.all(sql, params, (err, rows) => {
-                if (err) reject(err);
-                else resolve([rows || []]);
+                if (err) {
+                    const error = new Error(`Query error: ${err.message}`);
+                    error.code = err.code;
+                    error.sql = sql;
+                    reject(error);
+                } else {
+                    resolve([rows || []]);
+                }
             });
         } else {
             db.run(sql, params, function(err) {
-                if (err) reject(err);
-                else {
-                    resolve([{ lastID: this.lastID, changes: this.changes }]);
+                if (err) {
+                    const error = new Error(`Query error: ${err.message}`);
+                    error.code = err.code;
+                    error.sql = sql;
+                    reject(error);
+                } else {
+                    resolve([
+                        {
+                            lastID: this.lastID,
+                            changes: this.changes,
+                            affectedRows: this.changes
+                        }
+                    ]);
                 }
             });
         }
     });
 }
 
+/**
+ * Waits for database to be initialized
+ * @returns {Promise<void>}
+ */
+function waitForDbReady() {
+    return dbReadyPromise;
+}
+
 module.exports = {
     query: promisifyQuery,
+    validateJSONData,
+    waitForDbReady,
+    dbReady: () => dbReady,
     close: () => {
         return new Promise((resolve, reject) => {
             db.close((err) => {
                 if (err) reject(err);
                 else {
                     console.log("Local database connection closed");
+                    dbReady = false;
                     resolve();
                 }
             });

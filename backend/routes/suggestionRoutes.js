@@ -4,7 +4,7 @@ const db = require("../db");
 
 router.get("/suggestions/:id",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM Suggestions WHERE id = ?",[req.params.id]);
+        const [rows] = await db.query("SELECT * FROM suggestions WHERE id = ?",[req.params.id]);
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {
@@ -14,7 +14,17 @@ router.get("/suggestions/:id",async (req,res) =>{
 
 router.get("/suggestions/commenter/:id",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM Suggestions WHERE commenter_id = ?",[req.params.id]);
+        const [rows] = await db.query("SELECT * FROM suggestions WHERE commenter_id = ?",[req.params.id]);
+        res.status(200).json({ ok: true, data: rows });
+        }
+    catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+        }
+});
+
+router.get("/suggestions/note/:note_id",async (req,res) =>{
+    try{
+        const [rows] = await db.query("SELECT * FROM suggestions WHERE note_id = ?",[req.params.note_id]);
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {
@@ -24,8 +34,8 @@ router.get("/suggestions/commenter/:id",async (req,res) =>{
 
 router.post("/suggestions",async (req,res) =>{
     try{
-        const {commenter_id,suggestion_data,note_owner_id} = req.body;
-        const [result] = await db.query("INSERT INTO Suggestions (commenter_id,suggestion_data,note_owner_id) VALUES (?, ?, ?)",[commenter_id,suggestion_data,note_owner_id]);
+        const {note_id,commenter_id,suggestion_data} = req.body;
+        const [result] = await db.query("INSERT INTO suggestions (note_id,commenter_id,suggestion_data) VALUES (?, ?, ?)",[note_id,commenter_id,suggestion_data]);
         return res.status(201).json({
             ok: true,
             message: "Suggestion created",
@@ -39,7 +49,7 @@ router.post("/suggestions",async (req,res) =>{
 
 router.delete("/suggestions/:id", async (req,res) =>{
     try{
-        const [result] = await db.query("DELETE FROM Suggestions WHERE id = ?",[req.params.id]);
+        const [result] = await db.query("DELETE FROM suggestions WHERE id = ?",[req.params.id]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Suggestion not found" });
         }
@@ -53,8 +63,8 @@ router.delete("/suggestions/:id", async (req,res) =>{
 
 router.put("/suggestions/:id", async (req,res) =>{
     try{
-        const {commenter_id,suggestion_data,note_owner_id} = req.body;
-        const [result] = await db.query("UPDATE Suggestions SET commenter_id = ?, suggestion_data = ?, note_owner_id = ? WHERE id = ?",[commenter_id,suggestion_data,note_owner_id,req.params.id]);
+        const {suggestion_data} = req.body;
+        const [result] = await db.query("UPDATE suggestions SET suggestion_data = ? WHERE id = ?",[suggestion_data,req.params.id]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "Suggestion not found" });
         }
@@ -64,7 +74,5 @@ router.put("/suggestions/:id", async (req,res) =>{
         res.status(500).json({ ok: false, error: err.message });
     }
 });
-
-
 
 module.exports = router;

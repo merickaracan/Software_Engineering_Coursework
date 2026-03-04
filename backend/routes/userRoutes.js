@@ -14,8 +14,8 @@ router.get("/users/:email", async (req, res) => {
 
 router.post("/users",async (req,res) =>{
     try{
-        const {email,passkey,lecturer,points} = req.body;
-        const [result] = await db.query("INSERT INTO user_data (email,passkey,lecturer,points) VALUES (?, ?, ?, ?)",[email,passkey,lecturer,points]);
+        const {email, name, password_hash,is_lecturer,points} = req.body;
+        const [result] = await db.query("INSERT INTO user_data (email, name, password_hash,is_lecturer,points) VALUES (?, ?, ?, ?, ?)",[email, name, password_hash,is_lecturer,points]);
         return res.status(201).json({
             ok: true,
             message: "User created",
@@ -43,8 +43,8 @@ router.delete("/users/:email", async (req,res) =>{
 
 router.put("/users/:email", async (req,res) =>{
     try{
-        const {passkey,lecturer,points} = req.body;
-        const [result] = await db.query("UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",[passkey,lecturer,points,req.params.email]);
+        const {name, password_hash,is_lecturer,points} = req.body;
+        const [result] = await db.query("UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",[name, password_hash,is_lecturer,points,req.params.email]);
         if (result.affectedRows == 0){
             return res.status(404).json({ ok: false, error: "User not found" });
         }

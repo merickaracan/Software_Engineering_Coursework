@@ -18,12 +18,13 @@ describe("Notes Routes", () => {
       const noteId = "1";
       const mockNote = {
         id: noteId,
-        email: "user@bath.ac.uk",
+        owner_id: 1,
+        title: "Test Note Title",
         module: "CM50109",
         note_data: "Test note content",
-        verified: 1,
-        rating_average: 4.5,
-        number_ratings: 10,
+        is_verified: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
       };
 
       db.query.mockResolvedValueOnce([[mockNote]]);
@@ -60,8 +61,8 @@ describe("Notes Routes", () => {
     it("should fetch all notes for a module", async () => {
       const module = "CM50109";
       const mockNotes = [
-        { id: 1, email: "user1@bath.ac.uk", module, note_data: "Note 1" },
-        { id: 2, email: "user2@bath.ac.uk", module, note_data: "Note 2" },
+        { id: 1, owner_id: 1, title: "Note 1", module, note_data: "Note 1", is_verified: 1 },
+        { id: 2, owner_id: 2, title: "Note 2", module, note_data: "Note 2", is_verified: 0 },
       ];
 
       db.query.mockResolvedValueOnce([mockNotes]);
@@ -85,13 +86,16 @@ describe("Notes Routes", () => {
   });
 
   describe("GET /api/notes/email/:email", () => {
-    it("should fetch all notes by email", async () => {
+    it("should fetch all notes by owner email", async () => {
       const email = "user@bath.ac.uk";
       const mockNotes = [
-        { id: 1, email, module: "CM50109", note_data: "Note 1" },
-        { id: 2, email, module: "CM50264", note_data: "Note 2" },
+        { id: 1, owner_id: 1, title: "Note 1", module: "CM50109", note_data: "Note 1", is_verified: 1 },
+        { id: 2, owner_id: 1, title: "Note 2", module: "CM50264", note_data: "Note 2", is_verified: 0 },
       ];
 
+      // Mock user lookup
+      db.query.mockResolvedValueOnce([[{ id: 1 }]]);
+      // Mock notes fetch
       db.query.mockResolvedValueOnce([mockNotes]);
 
       const res = await request(app).get(`/api/notes/email/${email}`);
@@ -100,21 +104,32 @@ describe("Notes Routes", () => {
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toEqual(mockNotes);
     });
+
+    it("should return 404 if user not found", async () => {
+      const email = "nonexistent@bath.ac.uk";
+      db.query.mockResolvedValueOnce([[]]);
+
+      const res = await request(app).get(`/api/notes/email/${email}`);
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.error).toBe("User not found");
+    });
   });
 
   describe("POST /api/notes", () => {
     it("should create a new note", async () => {
       const noteData = {
-        email: "user@bath.ac.uk",
-        verified: 0,
+        owner_email: "user@bath.ac.uk",
+        title: "New Note Title",
         note_data: "New note content",
-        rating_average: 0,
-        number_ratings: 0,
         module: "CM50109",
-        note_title: "My First Note",
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 1 }]);
+      // Mock user lookup
+      db.query.mockResolvedValueOnce([[{ id: 1 }]]);
+      // Mock note creation
+      db.query.mockResolvedValueOnce([{ insertId: 1, lastID: 1 }]);
 
       const res = await request(app).post("/api/notes").send(noteData);
 
@@ -123,24 +138,37 @@ describe("Notes Routes", () => {
       expect(res.body.insertId).toBe(1);
     });
 
-    it("should handle missing fields gracefully", async () => {
-      const incompleteNote = {
-        email: "user@bath.ac.uk",
-        note_data: "No module specified",
+    it("should return 400 if user not found", async () => {
+      const noteData = {
+        owner_email: "nonexistent@bath.ac.uk",
+        title: "Test Note",
+        note_data: "New note content",
+        module: "CM50109",
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 2 }]);
+      db.query.mockResolvedValueOnce([[]]);
 
-      const res = await request(app).post("/api/notes").send(incompleteNote);
+      const res = await request(app).post("/api/notes").send(noteData);
 
-      expect(res.statusCode).toBe(201);
-      expect(res.body.ok).toBe(true);
+      expect(res.statusCode).toBe(400);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.error).toBe("User not found");
     });
 
     it("should handle database errors", async () => {
+      const noteData = {
+        owner_email: "user@bath.ac.uk",
+        title: "Error Test Note",
+        note_data: "New note content",
+        module: "CM50109",
+      };
+
+      // Mock user lookup success
+      db.query.mockResolvedValueOnce([[{ id: 1 }]]);
+      // Mock insert failure
       db.query.mockRejectedValueOnce(new Error("DB insert failed"));
 
-      const res = await request(app).post("/api/notes").send({});
+      const res = await request(app).post("/api/notes").send(noteData);
 
       expect(res.statusCode).toBe(500);
       expect(res.body.ok).toBe(false);
@@ -151,13 +179,9 @@ describe("Notes Routes", () => {
     it("should update a note", async () => {
       const noteId = 1;
       const updateData = {
-        email: "user@bath.ac.uk",
-        verified: 1,
+        title: "Updated Note Title",
         note_data: "Updated content",
-        rating_average: 4.2,
-        number_ratings: 15,
         module: "CM50109",
-        note_title: "Updated Title",
       };
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
@@ -170,9 +194,15 @@ describe("Notes Routes", () => {
     });
 
     it("should return 404 if note not found", async () => {
+      const updateData = {
+        title: "Updated Title",
+        note_data: "Updated content",
+        module: "CM50109",
+      };
+
       db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
 
-      const res = await request(app).put("/api/notes/999").send({});
+      const res = await request(app).put("/api/notes/999").send(updateData);
 
       expect(res.statusCode).toBe(404);
       expect(res.body.ok).toBe(false);
@@ -190,7 +220,7 @@ describe("Notes Routes", () => {
       expect(res.body.ok).toBe(true);
       expect(res.body.message).toBe("Note verified");
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE notes SET verified = ? WHERE id = ?",
+        "UPDATE notes SET is_verified = ? WHERE id = ?",
         [1, "1"]
       );
     });
@@ -214,40 +244,9 @@ describe("Notes Routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.message).toBe("Note unverified");
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE notes SET verified = ? WHERE id = ?",
+        "UPDATE notes SET is_verified = ? WHERE id = ?",
         [0, "1"]
       );
-    });
-  });
-
-  describe("PUT /api/notes/rating", () => {
-    it("should update note rating", async () => {
-      const ratingData = {
-        id: 1,
-        average: 4.5,
-        number: 20,
-      };
-
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-
-      const res = await request(app).put("/api/notes/rating").send(ratingData);
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("Note updated");
-    });
-
-    it("should return 404 if note not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
-
-      const res = await request(app).put("/api/notes/rating").send({
-        id: 999,
-        average: 4.0,
-        number: 10,
-      });
-
-      expect(res.statusCode).toBe(404);
-      expect(res.body.error).toBe("Note not found");
     });
   });
 

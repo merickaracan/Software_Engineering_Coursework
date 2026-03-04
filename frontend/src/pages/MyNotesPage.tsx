@@ -1,18 +1,10 @@
-<<<<<<< HEAD:src/Pages/MyNotesPage.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout, Row, Col, Typography, Card, Tag, Empty } from "antd";
 import { FileTextOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button } from "antd";
-import PageLayout from "../Components/PageHeader";
-import { useTheme } from "../Components/ThemeContext";
-=======
-import React from "react";
-import { Layout, Row, Col, Typography, Card, Empty } from "antd";
-import { FileTextOutlined } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
->>>>>>> c72d57a26e76b3c25aec3cae161291906f5dd9f6:frontend/src/pages/MyNotesPage.tsx
 
 const { Title, Text } = Typography;
 const { Content } = Layout;

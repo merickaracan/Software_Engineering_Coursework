@@ -27,7 +27,6 @@ import { useTheme } from "../components/ThemeContext";
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
-<<<<<<< HEAD:src/Pages/Register.tsx
 const BATH_MAJORS = [
   // Faculty of Engineering & Design
   { value: "Architecture", label: "Architecture" },
@@ -63,7 +62,6 @@ const BATH_MAJORS = [
   { value: "Sports & Exercise Science", label: "Sports & Exercise Science" },
   { value: "Nursing", label: "Nursing" },
 ];
-=======
 const RegistrationRules = {
   name: [
     { required: true, message: "Please enter your name." },
@@ -95,7 +93,6 @@ const RegistrationRules = {
     }),
   ],
 };
->>>>>>> c72d57a26e76b3c25aec3cae161291906f5dd9f6:frontend/src/pages/Register.tsx
 
 interface RegisterFormValues {
   name: string;
@@ -110,20 +107,6 @@ const Register: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { isDark, toggleTheme } = useTheme();
 
-<<<<<<< HEAD:src/Pages/Register.tsx
-  const onFinish = (values: RegisterFormValues) => {
-    // Save to persistent registered users store (demo – no backend)
-    const stored = localStorage.getItem("registeredUsers");
-    const registeredUsers: Record<string, { name: string; email: string; major: string }> =
-      stored ? JSON.parse(stored) : {};
-
-    registeredUsers[values.email] = {
-      name: values.name,
-      email: values.email,
-      major: values.major,
-    };
-    localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers));
-=======
   const onFinish = async (values: RegisterFormValues) => {
     const { name, email, password } = values;
 
@@ -132,7 +115,6 @@ const Register: React.FC = () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
     });
->>>>>>> c72d57a26e76b3c25aec3cae161291906f5dd9f6:frontend/src/pages/Register.tsx
 
     const data = await request.json();
 

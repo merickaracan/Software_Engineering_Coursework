@@ -10,6 +10,8 @@ import LeaderboardPage from './Pages/LeaderboardPage';
 import MyNotesPage from './Pages/MyNotesPage';
 import ModulesPage from './Pages/ModulesPage';
 import CreateNotePage from './Pages/CreateNotePage';
+import NoteDetailPage from './Pages/NoteDetailPage';
+import EditNotePage from './Pages/EditNotePage';
 
 function AppRoutes() {
   const { isDark } = useTheme();
@@ -30,6 +32,8 @@ function AppRoutes() {
           <Route path="/my-notes" element={<MyNotesPage />} />
           <Route path="/modules" element={<ModulesPage />} />
           <Route path="/create-note" element={<CreateNotePage />} />
+          <Route path="/note/:id" element={<NoteDetailPage />} />
+          <Route path="/note/:id/edit" element={<EditNotePage />} />
           <Route path = "/" element={<Navigate to="/login"/>} />
         </Routes>
       </Router>

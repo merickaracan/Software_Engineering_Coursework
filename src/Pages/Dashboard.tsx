@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Layout,
@@ -7,6 +7,7 @@ import {
   Typography,
   Card,
   Empty,
+  Tag,
 } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
 import Leaderboard from "../Components/Leaderboard";
@@ -17,9 +18,34 @@ import { useTheme } from "../Components/ThemeContext";
 const { Title, Text } = Typography;
 const { Header, Content } = Layout;
 
+interface Note {
+  id: string;
+  title: string;
+  description: string;
+  module: string;
+  files: string[];
+  createdAt: string;
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  se: "Software Engineering",
+  ml: "Machine Learning",
+  sa: "Systems Architecture",
+  vc: "Visual Computing",
+  db: "Databases",
+  ai: "Artificial Intelligence",
+};
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const [recentNotes, setRecentNotes] = useState<Note[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("myNotes");
+    const notes: Note[] = stored ? JSON.parse(stored) : [];
+    setRecentNotes(notes.slice(-3).reverse());
+  }, []);
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -62,33 +88,41 @@ const Dashboard: React.FC = () => {
                 My Notes
               </Title>
             </Row>
-            <Row gutter={[16, 16]}>
-              {[1, 2, 3].map((i) => (
-                <Col xs={24} sm={12} md={8} key={i}>
-                  <Card
-                    hoverable
-                    style={{
-                      borderRadius: 12,
-                      boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
-                      border: isDark ? "1px solid #303030" : undefined,
-                      background: isDark ? "#1f1f1f" : "#fff",
-                    }}
-                  >
-                    <Title level={5} style={{ marginBottom: 4 }}>
-                      Note {i}
-                    </Title>
-                    <Text type="secondary" style={{ fontSize: 13 }}>
-                      This is a placeholder for note content. Replace with real data.
-                    </Text>
-                  </Card>
-                </Col>
-              ))}
-              {false && (
-                <Col span={24}>
-                  <Empty description="You have no notes yet." />
-                </Col>
-              )}
-            </Row>
+            {recentNotes.length === 0 ? (
+              <Empty description="You have no notes yet." />
+            ) : (
+              <Row gutter={[16, 16]}>
+                {recentNotes.map((note) => (
+                  <Col xs={24} sm={12} md={8} key={note.id}>
+                    <Card
+                      hoverable
+                      onClick={() => navigate(`/note/${note.id}`)}
+                      style={{
+                        borderRadius: 12,
+                        boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                        border: isDark ? "1px solid #303030" : undefined,
+                        background: isDark ? "#1f1f1f" : "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Title level={5} style={{ marginBottom: 6 }}>
+                        {note.title}
+                      </Title>
+                      <Tag color="blue" style={{ borderRadius: 6, marginBottom: 8 }}>
+                        {MODULE_LABELS[note.module] ?? note.module}
+                      </Tag>
+                      <Text type="secondary" style={{ fontSize: 13, display: "block" }}>
+                        {note.description
+                          ? note.description.length > 80
+                            ? note.description.slice(0, 80) + "…"
+                            : note.description
+                          : "No description."}
+                      </Text>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
           </section>
 
           {/* Modules section */}

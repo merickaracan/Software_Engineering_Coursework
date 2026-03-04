@@ -34,6 +34,7 @@ const dbProxy = {
     if (isCloudConnected) {
       try {
         const result = await cloudDb.query(sql, params);
+        console.log("✅ Cloud DB query successful");
         return result;
       } catch (err) {
         console.error("❌ Cloud database error:", err.message);

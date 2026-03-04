@@ -14,7 +14,7 @@ router.get("/suggestions/:id",async (req,res) =>{
 
 router.get("/suggestions/commenter/:id",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM suggestions WHERE commenter_id = ?",[req.params.id]);
+    const [rows] = await db.query("SELECT suggestions.id, suggestions.note_id, suggestions.commenter_id, suggestions.suggestion_data, suggestions.created_at, user_data.name as commenter_name, user_data.email as commenter_email, user_data.is_lecturer, user_data.profile_picture as commenter_profile_picture FROM suggestions LEFT JOIN user_data ON suggestions.commenter_id = user_data.id WHERE commenter_id = ?",[req.params.id]);
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {
@@ -24,7 +24,7 @@ router.get("/suggestions/commenter/:id",async (req,res) =>{
 
 router.get("/suggestions/note/:note_id",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM suggestions WHERE note_id = ?",[req.params.note_id]);
+    const [rows] = await db.query("SELECT suggestions.id, suggestions.note_id, suggestions.commenter_id, suggestions.suggestion_data, suggestions.created_at, user_data.name as commenter_name, user_data.email as commenter_email, user_data.is_lecturer, user_data.profile_picture as commenter_profile_picture FROM suggestions LEFT JOIN user_data ON suggestions.commenter_id = user_data.id WHERE suggestions.note_id = ?",[req.params.note_id]);
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {

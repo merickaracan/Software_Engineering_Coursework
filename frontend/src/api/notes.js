@@ -70,13 +70,14 @@ const getNotesByEmail = async (email) => {
 /**
  * Creates a new note
  * @param {string} ownerEmail - Note creator's email
+ * @param {string} title - Note title
  * @param {string} noteData - Note content
  * @param {string} module - Module code
- * @param {number} [isVerified=0] - Verification status (0 or 1)
+ * @param {Object} [file=null] - Optional file object with {name, type, size, data}
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
+const createNote = async (ownerEmail, title, noteData, module, file = null) => {
     try {
         const response = await fetch("/api/notes", {
             method: "POST",
@@ -85,10 +86,11 @@ const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
             },
             credentials: "include",
             body: JSON.stringify({
-                ownerEmail,
-                noteData,
-                module,
-                isVerified
+                owner_email: ownerEmail,
+                title: title,
+                note_data: noteData,
+                module: module,
+                file: file
             })
         });
         const data = await response.json();
@@ -102,12 +104,14 @@ const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
 /**
  * Updates an existing note
  * @param {number} id - Note ID
+ * @param {string|null} [title=null] - New note title (optional)
  * @param {string|null} [noteData=null] - New note content (optional)
  * @param {string|null} [module=null] - New module code (optional)
+ * @param {Object|null} [file=null] - Optional file object with {name, type, size, data}
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const updateNote = async (id, noteData = null, module = null) => {
+const updateNote = async (id, title = null, noteData = null, module = null, file = null) => {
     try {
         const response = await fetch(`/api/notes/${id}`, {
             method: "PUT",
@@ -116,8 +120,10 @@ const updateNote = async (id, noteData = null, module = null) => {
             },
             credentials: "include",
             body: JSON.stringify({
-                noteData,
-                module
+                title: title,
+                note_data: noteData,
+                module: module,
+                file: file
             })
         });
         const data = await response.json();
@@ -197,10 +203,39 @@ const deleteNote = async (id) => {
     }
 };
 
+/**
+ * Searches for notes by title and/or author
+ * @param {string} [title] - Search term for note title
+ * @param {string} [author] - Search term for author email
+ * @returns {Promise<Object>} Response data with array of matching notes
+ * @throws {Error} If the request fails
+ */
+const searchNotes = async (title = "", author = "") => {
+    try {
+        const params = new URLSearchParams();
+        if (title) params.append("title", title);
+        if (author) params.append("author", author);
+        
+        const response = await fetch(`/api/search?${params.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+        });
+        const data = await response.json();
+        return data;
+    } catch (err) {
+        console.error("Error searching notes:", err);
+        throw err;
+    }
+};
+
 export {
     getNoteById,
     getNotesByModule,
     getNotesByEmail,
+    searchNotes,
     createNote,
     updateNote,
     verifyNote,

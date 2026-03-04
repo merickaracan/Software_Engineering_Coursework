@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Layout,
@@ -25,6 +25,38 @@ import { useTheme } from "../components/ThemeContext";
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
+const RegistrationRules = {
+  name: [
+    { required: true, message: "Please enter your name." },
+    { min: 2, message: "Name should be at least 2 characters." },
+  ],
+  email: [
+    { required: true, message: "Please enter your email." },
+    { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
+    { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
+    // Also must check if email is already registed
+  ],
+  password: [
+    { required: true, message: "Please enter your password." },
+    { min: 8, message: "Password must be at least 8 characters." },
+    { pattern: /[a-z]/, message: "Must contain at least one lowercase letter." },
+    { pattern: /[A-Z]/, message: "Must contain at least one uppercase letter." },
+    { pattern: /[0-9]/, message: "Must contain at least one number." },
+    { pattern: /[!@#$%^&*(),.?":{}|<>]/, message: "Must contain at least one symbol." },
+  ],
+  confirmPassword: [
+    { required: true, message: "Please confirm your password." },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        if (value && getFieldValue("password") === value) {
+          return Promise.resolve();
+        }
+        return Promise.reject(new Error("Passwords do not match."));
+      },
+    }),
+  ],
+};
+
 interface RegisterFormValues {
   name: string;
   email: string;
@@ -34,26 +66,32 @@ interface RegisterFormValues {
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const { isDark, toggleTheme } = useTheme();
 
-  const onFinish = (values: RegisterFormValues) => {
-    // Save to persistent registered users store (demo – no backend)
-    const stored = localStorage.getItem("registeredUsers");
-    const registeredUsers: Record<string, { name: string; email: string }> =
-      stored ? JSON.parse(stored) : {};
+  const onFinish = async (values: RegisterFormValues) => {
+    const { name, email, password } = values;
 
-    registeredUsers[values.email] = {
-      name: values.name,
-      email: values.email,
-    };
-    localStorage.setItem("registeredUsers", JSON.stringify(registeredUsers));
+    const request = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    });
 
-    console.log("Register form submitted:", values);
-    message.success("Account created successfully!");
+    const data = await request.json();
 
+    // Failure
+    if (!request.ok) {
+      const errorMessages = data.errors ? data.errors.join(",\n") : "Unknown error.";
+      message.error(`Failed to create account: ${errorMessages}`);
+      return;
+    }
+
+    // Success
+    message.success("Account created!");
     setTimeout(() => {
-      navigate("/");
-    }, 800);
+      navigate("/login");
+    }, 2000);
   };
 
   const onFinishFailed = () => {
@@ -169,13 +207,7 @@ const Register: React.FC = () => {
                     <Form.Item
                       label="Name"
                       name="name"
-                      rules={[
-                        { required: true, message: "Please enter your name." },
-                        {
-                          min: 2,
-                          message: "Name should be at least 2 characters.",
-                        },
-                      ]}
+                      rules={RegistrationRules.name}
                     >
                       <Input
                         prefix={<UserOutlined />}
@@ -187,17 +219,11 @@ const Register: React.FC = () => {
                     <Form.Item
                       label="Email"
                       name="email"
-                      rules={[
-                        { required: true, message: "Please enter your email." },
-                        {
-                          type: "email",
-                          message: "Please enter a valid email.",
-                        },
-                      ]}
+                      rules={RegistrationRules.email}
                     >
                       <Input
                         prefix={<MailOutlined />}
-                        placeholder="ab1234@bath.ac."
+                        placeholder="ab1234@bath.ac.uk"
                         size="large"
                       />
                     </Form.Item>
@@ -205,31 +231,17 @@ const Register: React.FC = () => {
                     <Form.Item
                       label="Password"
                       name="password"
-                      rules={[
-                        { required: true, message: "Please enter a password." },
-                        {
-                          min: 8,
-                          message: "Password must be at least 8 characters.",
-                        },
-                        {
-                          pattern: /[A-Z]/,
-                          message: "Must contain at least one uppercase letter.",
-                        },
-                        {
-                          pattern: /[a-z]/,
-                          message: "Must contain at least one lowercase letter.",
-                        },
-                        {
-                          pattern: /[0-9]/,
-                          message: "Must contain at least one number.",
-                        },
-                      ]}
+                      rules={RegistrationRules.password}
                       hasFeedback
                     >
                       <Input.Password
                         prefix={<LockOutlined />}
                         placeholder="Create a strong password"
                         size="large"
+                        visibilityToggle={{
+                          visible: passwordVisible,
+                          onVisibleChange: setPasswordVisible,
+                        }}
                       />
                     </Form.Item>
 
@@ -238,27 +250,16 @@ const Register: React.FC = () => {
                       name="confirmPassword"
                       dependencies={["password"]}
                       hasFeedback
-                      rules={[
-                        {
-                          required: true,
-                          message: "Please confirm your password.",
-                        },
-                        ({ getFieldValue }) => ({
-                          validator(_, value) {
-                            if (!value || getFieldValue("password") === value) {
-                              return Promise.resolve();
-                            }
-                            return Promise.reject(
-                              new Error("The passwords do not match.")
-                            );
-                          },
-                        }),
-                      ]}
+                      rules={RegistrationRules.confirmPassword}
                     >
                       <Input.Password
                         prefix={<CheckCircleOutlined />}
                         placeholder="Repeat your password"
                         size="large"
+                        visibilityToggle={{
+                          visible: passwordVisible,
+                          onVisibleChange: setPasswordVisible,
+                        }}
                       />
                     </Form.Item>
 
@@ -283,7 +284,7 @@ const Register: React.FC = () => {
                   <div style={{ textAlign: "center", marginTop: 12 }}>
                     <Text type="secondary" style={{ fontSize: 13 }}>
                       Already have an account?{" "}
-                      <a href="/" style={{ color: "#0b5ed7", fontWeight: 500 }}>
+                      <a href="/login" style={{ color: "#0b5ed7", fontWeight: 500 }}>
                         Back to login
                       </a>
                     </Text>

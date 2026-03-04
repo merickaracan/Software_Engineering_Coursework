@@ -97,6 +97,12 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
         </span>
       ),
     },
+    {
+      title: "Notes Shared",
+      dataIndex: "totalNotes",
+      key: "totalNotes",
+      render: (count: number) => <Text>{count}</Text>,
+    },
   ];
 
   return (

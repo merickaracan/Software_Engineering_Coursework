@@ -31,4 +31,4 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   );
 };
 
-export { ThemeProvider , useTheme };
+export {useTheme, ThemeProvider};

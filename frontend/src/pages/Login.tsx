@@ -12,10 +12,11 @@ import {
   Space,
   message,
 } from "antd";
+import type { Rule } from "antd/es/form";
 import {
   UserOutlined,
   LockOutlined,
-  LoginOutlined,
+  LoginOutlined,  
   SunOutlined,
   MoonOutlined,
 } from "@ant-design/icons";
@@ -24,34 +25,60 @@ import { useTheme } from "../components/ThemeContext";
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
+const LoginRules: Record<string, Rule[]> = {
+  email: [
+      { required: true, message: "Please enter your email." },
+      { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
+      { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
+  ],
+  
+  password: [
+    { required: true, message: "Please enter your password." },
+
+  ],
+  
+};
+
 interface LoginFormValues {
   email: string;
   password: string;
 }
 
-const Login: React.FC = () => {
+
+
+const Login = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
 
-  const onFinish = (values: LoginFormValues) => {
+  const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
-    setTimeout(() => {
-      // Look up user from registered users
-      const stored = localStorage.getItem("registeredUsers");
-      const registeredUsers: Record<string, { name: string; email: string }> =
-        stored ? JSON.parse(stored) : {};
 
-      const matched = registeredUsers[values.email];
-      if (matched) {
-        localStorage.setItem("user", JSON.stringify(matched));
-      }
+    const request = await fetch("/api/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json",},
+      credentials: "include",
+      body: JSON.stringify(values)
+    })
 
-      console.log("Login form submitted:", values);
-      message.success("Logged in successfully");
+    const data = await request.json();
+
+    if (!data.ok) {
+      message.error(data.message || "Login failed. Please try again.");
       setLoading(false);
+      return;
+    }
+
+    // Set authentication state if callback provided
+    if (setIsAuthenticated) {
+      setIsAuthenticated(true);
+    }
+
+    message.success("Logged in successfully");
+    setLoading(false);
+    setTimeout(() => {
       navigate("/dashboard");
-    }, 700);
+    }, 1000);
   };
 
   const onFinishFailed = () => {
@@ -166,10 +193,7 @@ const Login: React.FC = () => {
                     <Form.Item
                       label="Email"
                       name="email"
-                      rules={[
-                        { required: true, message: "Please enter your email." },
-                        { type: "email", message: "Please enter a valid email." },
-                      ]}
+                      rules={LoginRules.email}
                     >
                       <Input
                         prefix={<UserOutlined />}
@@ -178,14 +202,13 @@ const Login: React.FC = () => {
                       />
                     </Form.Item>
 
+
                     <Form.Item
                       label="Password"
                       name="password"
-                      rules={[
-                        { required: true, message: "Please enter your password." },
-                        { min: 6, message: "Password should be at least 6 characters." },
-                      ]}
+                      rules={LoginRules.password}
                     >
+                      
                       <Input.Password
                         prefix={<LockOutlined />}
                         placeholder="Enter your password"

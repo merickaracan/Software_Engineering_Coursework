@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Layout,
@@ -11,6 +11,9 @@ import {
   Tag,
   Button,
   Empty,
+  Space,
+  Upload,
+  message,
 } from "antd";
 import {
   UserOutlined,
@@ -20,6 +23,8 @@ import {
 } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
+import { logout } from "../api/auth";
+import { getUser, updateProfilePicture } from "../api/users";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -36,6 +41,27 @@ const AVAILABLE_MODULES: Record<string, { name: string; code: string }> = {
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await logout();
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      // Still clear local storage even if logout fails
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
 
   const stored = localStorage.getItem("user");
   const user = stored ? JSON.parse(stored) : null;
@@ -43,6 +69,94 @@ const Profile: React.FC = () => {
   const name = user?.name ?? "No name set";
   const email = user?.email ?? "No email set";
   const major = user?.major ?? null;
+
+  useEffect(() => {
+    const fetchProfilePicture = async () => {
+      if (!email || email === "No email set") return;
+
+      try {
+        const response = await getUser(email);
+        if (response.ok && Array.isArray(response.data) && response.data.length > 0) {
+          setProfilePicture(response.data[0].profile_picture || null);
+        }
+      } catch (error) {
+        console.error("Error fetching profile picture:", error);
+      }
+    };
+
+    fetchProfilePicture();
+  }, [email]);
+
+  const convertFileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadProfilePicture = async (file: File) => {
+    if (!email || email === "No email set") {
+      message.error("Unable to identify user");
+      return false;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      message.error("Please select an image file");
+      return false;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      message.error("Image must be smaller than 2MB");
+      return false;
+    }
+
+    try {
+      setUploadingPicture(true);
+      const dataUrl = await convertFileToDataUrl(file);
+      const response = await updateProfilePicture(email, dataUrl);
+
+      if (!response.ok) {
+        message.error(response.error || "Failed to update profile picture");
+        return false;
+      }
+
+      setProfilePicture(dataUrl);
+      message.success("Profile picture updated");
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      message.error("Failed to update profile picture");
+    } finally {
+      setUploadingPicture(false);
+    }
+
+    return false;
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    if (!email || email === "No email set") {
+      message.error("Unable to identify user");
+      return;
+    }
+
+    try {
+      setUploadingPicture(true);
+      const response = await updateProfilePicture(email, null);
+      if (!response.ok) {
+        message.error(response.error || "Failed to remove profile picture");
+        return;
+      }
+
+      setProfilePicture(null);
+      message.success("Profile picture removed");
+    } catch (error) {
+      console.error("Error removing profile picture:", error);
+      message.error("Failed to remove profile picture");
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
 
   const storedModules = localStorage.getItem("selectedModules");
   const selectedIds: string[] = storedModules ? JSON.parse(storedModules) : [];
@@ -75,9 +189,24 @@ const Profile: React.FC = () => {
             >
               <Avatar
                 size={96}
+                src={profilePicture || undefined}
                 icon={<UserOutlined />}
                 style={{ backgroundColor: "#0b5ed7", marginBottom: 16 }}
               />
+              <Space style={{ marginBottom: 12 }}>
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={handleUploadProfilePicture}
+                >
+                  <Button loading={uploadingPicture}>Change profile picture</Button>
+                </Upload>
+                {profilePicture && (
+                  <Button danger onClick={handleRemoveProfilePicture} loading={uploadingPicture}>
+                    Remove
+                  </Button>
+                )}
+              </Space>
               <Title level={3} style={{ margin: 0 }}>
                 {name}
               </Title>
@@ -167,10 +296,8 @@ const Profile: React.FC = () => {
                     size="large"
                     icon={<LogoutOutlined />}
                     style={{ borderRadius: 8 }}
-                    onClick={() => {
-                      localStorage.removeItem("user");
-                      navigate("/login");
-                    }}
+                    loading={logoutLoading}
+                    onClick={handleLogout}
                   >
                     Log out
                   </Button>

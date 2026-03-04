@@ -22,6 +22,7 @@ import {
 import type { UploadFile } from "antd";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
+import { getNoteById, updateNote } from "../api/notes";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -40,11 +41,13 @@ const MODULES = [
 interface Note {
   id: string;
   title: string;
-  description: string;
+  note_data: string;
   module: string;
-  files: string[];
-  createdAt: string;
-  ownerEmail: string;
+  owner_email: string;
+  file_name?: string;
+  file_type?: string;
+  file_size?: number;
+  file_data?: string;
 }
 
 const EditNotePage: React.FC = () => {
@@ -61,34 +64,65 @@ const EditNotePage: React.FC = () => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("myNotes");
-    const notes: Note[] = stored ? JSON.parse(stored) : [];
-    const found = notes.find((n) => n.id === id) ?? null;
-    setNote(found);
-
-    if (found) {
-      const storedUser = localStorage.getItem("user");
-      const currentUser = storedUser ? JSON.parse(storedUser) : null;
-      // If ownerEmail is absent (note predates ownership feature), any logged-in user can edit
-      const owns = !found.ownerEmail || currentUser?.email === found.ownerEmail;
-      setIsOwner(owns);
-
-      if (owns) {
-        setTitle(found.title);
-        setDescription(found.description);
-        setModule(found.module);
-        setFileList(
-          found.files.map((name, i) => ({
-            uid: String(i),
-            name,
-            status: "done" as const,
-          }))
-        );
+    const fetchNote = async () => {
+      if (!id) {
+        setNote(null);
+        return;
       }
-    }
+
+      try {
+        const response = await getNoteById(id);
+        const found = response?.ok && Array.isArray(response.data) && response.data.length > 0
+          ? response.data[0]
+          : null;
+
+        setNote(found);
+
+        if (!found) {
+          return;
+        }
+
+        const storedUser = localStorage.getItem("user");
+        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+        const owns = currentUser?.email === found.owner_email;
+        setIsOwner(owns);
+
+        if (owns) {
+          setTitle(found.title || "");
+          setDescription(found.note_data || "");
+          setModule(found.module);
+
+          if (found.file_name) {
+            setFileList([
+              {
+                uid: "existing-file",
+                name: found.file_name,
+                status: "done",
+              },
+            ]);
+          } else {
+            setFileList([]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching note for editing:", error);
+        setNote(null);
+      }
+    };
+
+    fetchNote();
   }, [id]);
 
-  const handleSave = () => {
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleSave = async () => {
     if (!title.trim()) {
       message.error("Please enter a note title.");
       return;
@@ -98,22 +132,48 @@ const EditNotePage: React.FC = () => {
       return;
     }
 
-    const stored = localStorage.getItem("myNotes");
-    const notes: Note[] = stored ? JSON.parse(stored) : [];
-    const updated = notes.map((n) =>
-      n.id === id
-        ? {
-            ...n,
-            title: title.trim(),
-            description: description.trim(),
-            module,
-            files: fileList.map((f) => f.name),
-          }
-        : n
-    );
-    localStorage.setItem("myNotes", JSON.stringify(updated));
-    message.success("Note updated successfully!");
-    setTimeout(() => navigate(`/note/${id}`), 400);
+    if (!id || !note) {
+      message.error("Note not found.");
+      return;
+    }
+
+    try {
+      let filePayload = null;
+
+      if (fileList.length > 0) {
+        const selectedFile = fileList[0];
+
+        if (selectedFile.originFileObj) {
+          const base64 = await fileToBase64(selectedFile.originFileObj);
+          filePayload = {
+            name: selectedFile.name,
+            type: selectedFile.type || "application/octet-stream",
+            size: selectedFile.size || 0,
+            data: base64,
+          };
+        } else if (note.file_name && note.file_data) {
+          filePayload = {
+            name: note.file_name,
+            type: note.file_type || "application/octet-stream",
+            size: note.file_size || 0,
+            data: note.file_data,
+          };
+        }
+      }
+
+      const response = await updateNote(id, title.trim(), description.trim(), module, filePayload);
+
+      if (!response.ok) {
+        message.error(response.error || "Failed to update note.");
+        return;
+      }
+
+      message.success("Note updated successfully!");
+      setTimeout(() => navigate(`/note/${id}`), 400);
+    } catch (error) {
+      console.error("Error updating note:", error);
+      message.error("Failed to update note. Please try again.");
+    }
   };
 
   const cardStyle: React.CSSProperties = {
@@ -227,7 +287,7 @@ const EditNotePage: React.FC = () => {
             <Card style={cardStyle}>
               <Text strong style={{ display: "block", marginBottom: 12 }}>Upload Files</Text>
               <Dragger
-                multiple
+                maxCount={1}
                 fileList={fileList}
                 onChange={({ fileList: newFileList }) => setFileList(newFileList)}
                 beforeUpload={() => false}

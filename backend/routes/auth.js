@@ -69,7 +69,7 @@ function validateRegistration(data) {
 
 // Register User
 router.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, is_lecturer } = req.body;
 
   // Validate input
   const validationErrors = validateRegistration({ name, email, password });
@@ -93,8 +93,10 @@ router.post("/register", async (req, res) => {
   // Hash password before storing
   const hashedPassword = await bcrypt.hash(password, 12);
 
+  const lecturerFlag = is_lecturer ? 1 : 0;
+
   // Add data to database
-  await createUser(email, name, hashedPassword);
+  await createUser(email, name, hashedPassword, lecturerFlag);
 
   res.json({
     ok: true,

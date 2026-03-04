@@ -69,6 +69,7 @@ describe("Register", () => {
           name: "Test User",
           email: "user@bath.ac.uk",
           password: "Password123!",
+          is_lecturer: false,
         }),
       });
     });

@@ -13,9 +13,11 @@ describe("User Routes", () => {
     it("should fetch a user by email", async () => {
       const email = "user@bath.ac.uk";
       const mockUser = {
+        id: 1,
+        name: "Test User",
         email,
-        passkey: "hashed_password",
-        lecturer: 0,
+        password_hash: "hashed_password",
+        is_lecturer: 0,
         points: 100,
       };
 
@@ -55,12 +57,13 @@ describe("User Routes", () => {
     it("should create a new user", async () => {
       const userData = {
         email: "newuser@bath.ac.uk",
-        passkey: "hashed_password_123",
-        lecturer: 0,
+        name: "New User",
+        password_hash: "hashed_password_123",
+        is_lecturer: 0,
         points: 0,
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 1 }]);
+      db.query.mockResolvedValueOnce([{ insertId: 1, lastID: 1 }]);
 
       const res = await request(app).post("/api/users").send(userData);
 
@@ -73,10 +76,10 @@ describe("User Routes", () => {
     it("should handle missing required fields", async () => {
       const incompleteUser = {
         email: "user@bath.ac.uk",
-        // missing passkey
+        // missing password_hash
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 2 }]);
+      db.query.mockResolvedValueOnce([{ insertId: 2, lastID: 2 }]);
 
       const res = await request(app).post("/api/users").send(incompleteUser);
 
@@ -89,7 +92,7 @@ describe("User Routes", () => {
 
       const res = await request(app).post("/api/users").send({
         email: "duplicate@bath.ac.uk",
-        passkey: "password",
+        password_hash: "password",
       });
 
       expect(res.statusCode).toBe(500);
@@ -101,8 +104,9 @@ describe("User Routes", () => {
     it("should update a user", async () => {
       const email = "user@bath.ac.uk";
       const updateData = {
-        passkey: "new_hashed_password",
-        lecturer: 1,
+        name: "Updated User",
+        password_hash: "new_hashed_password",
+        is_lecturer: 1,
         points: 150,
       };
 

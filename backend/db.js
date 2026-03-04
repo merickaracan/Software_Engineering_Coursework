@@ -4,6 +4,11 @@ require("dotenv").config();
 
 const localDb = require("./localDb");
 
+// Ensure local database is ready before accepting queries
+localDb.waitForDbReady().catch((err) => {
+  console.error("Failed to initialize local database:", err.message);
+});
+
 // Create MySQL connection pool
 const cloudConnection = mysql.createPool({
   host: process.env.DB_HOST,
@@ -29,6 +34,7 @@ const dbProxy = {
     if (isCloudConnected) {
       try {
         const result = await cloudDb.query(sql, params);
+        console.log("✅ Cloud DB query successful");
         return result;
       } catch (err) {
         console.error("❌ Cloud database error:", err.message);

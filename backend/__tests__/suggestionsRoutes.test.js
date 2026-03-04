@@ -14,9 +14,10 @@ describe("Suggestions Routes", () => {
       const suggestionId = 1;
       const mockSuggestion = {
         id: suggestionId,
+        note_id: 5,
         commenter_id: 10,
         suggestion_data: "Consider adding more examples",
-        note_owner_id: 5,
+        created_at: "2024-01-01T00:00:00Z",
       };
 
       db.query.mockResolvedValueOnce([[mockSuggestion]]);
@@ -53,15 +54,17 @@ describe("Suggestions Routes", () => {
       const mockSuggestions = [
         {
           id: 1,
+          note_id: 5,
           commenter_id: commenterId,
           suggestion_data: "Suggestion 1",
-          note_owner_id: 5,
+          created_at: "2024-01-01T00:00:00Z",
         },
         {
           id: 2,
+          note_id: 6,
           commenter_id: commenterId,
           suggestion_data: "Suggestion 2",
-          note_owner_id: 6,
+          created_at: "2024-01-02T00:00:00Z",
         },
       ];
 
@@ -73,7 +76,7 @@ describe("Suggestions Routes", () => {
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toEqual(mockSuggestions);
       expect(db.query).toHaveBeenCalledWith(
-        "SELECT * FROM Suggestions WHERE commenter_id = ?",
+        "SELECT * FROM suggestions WHERE commenter_id = ?",
         [commenterId]
       );
     });
@@ -88,15 +91,58 @@ describe("Suggestions Routes", () => {
     });
   });
 
+  describe("GET /api/suggestions/note/:note_id", () => {
+    it("should fetch all suggestions for a note", async () => {
+      const noteId = "5";
+      const mockSuggestions = [
+        {
+          id: 1,
+          note_id: noteId,
+          commenter_id: 10,
+          suggestion_data: "Suggestion 1",
+          created_at: "2024-01-01T00:00:00Z",
+        },
+        {
+          id: 2,
+          note_id: noteId,
+          commenter_id: 11,
+          suggestion_data: "Suggestion 2",
+          created_at: "2024-01-02T00:00:00Z",
+        },
+      ];
+
+      db.query.mockResolvedValueOnce([mockSuggestions]);
+
+      const res = await request(app).get(`/api/suggestions/note/${noteId}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toEqual(mockSuggestions);
+      expect(db.query).toHaveBeenCalledWith(
+        "SELECT * FROM suggestions WHERE note_id = ?",
+        [noteId]
+      );
+    });
+
+    it("should return empty array if note has no suggestions", async () => {
+      db.query.mockResolvedValueOnce([[]]);
+
+      const res = await request(app).get("/api/suggestions/note/999");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.data).toEqual([]);
+    });
+  });
+
   describe("POST /api/suggestions", () => {
     it("should create a new suggestion", async () => {
       const suggestionData = {
+        note_id: 5,
         commenter_id: 10,
         suggestion_data: "Great note, needs more examples",
-        note_owner_id: 5,
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 1 }]);
+      db.query.mockResolvedValueOnce([{ insertId: 1, lastID: 1 }]);
 
       const res = await request(app).post("/api/suggestions").send(suggestionData);
 
@@ -108,11 +154,11 @@ describe("Suggestions Routes", () => {
 
     it("should handle missing required fields", async () => {
       const incompleteSuggestion = {
-        commenter_id: 10,
-        // missing suggestion_data and note_owner_id
+        note_id: 5,
+        // missing commenter_id and suggestion_data
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 2 }]);
+      db.query.mockResolvedValueOnce([{ insertId: 2, lastID: 2 }]);
 
       const res = await request(app).post("/api/suggestions").send(incompleteSuggestion);
 
@@ -134,9 +180,7 @@ describe("Suggestions Routes", () => {
     it("should update a suggestion", async () => {
       const suggestionId = 1;
       const updateData = {
-        commenter_id: 10,
         suggestion_data: "Updated suggestion text",
-        note_owner_id: 5,
       };
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);

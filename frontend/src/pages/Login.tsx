@@ -74,6 +74,10 @@ const Login = ({ setIsAuthenticated }) => {
       setIsAuthenticated(true);
     }
 
+    localStorage.setItem("user", JSON.stringify({
+      email: values.email,
+    }));
+
     message.success("Logged in successfully");
     setLoading(false);
     setTimeout(() => {

@@ -20,6 +20,7 @@ import {
 import type { UploadFile } from "antd";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
+import { createNote } from "../api/notes";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -51,7 +52,7 @@ const CreateNotePage: React.FC = () => {
     marginBottom: 24,
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) {
       message.error("Please enter a note title.");
       return;
@@ -61,26 +62,35 @@ const CreateNotePage: React.FC = () => {
       return;
     }
 
-    const storedUser = localStorage.getItem("user");
-    const currentUser = storedUser ? JSON.parse(storedUser) : null;
+    try {
+      const storedUser = localStorage.getItem("user");
+      const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
-    const note = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      description: description.trim(),
-      module,
-      files: fileList.map((f) => f.name),
-      createdAt: new Date().toISOString(),
-      ownerEmail: currentUser?.email ?? "",
-    };
+      if (!currentUser || !currentUser.email) {
+        message.error("Please log in first.");
+        navigate("/login");
+        return;
+      }
 
-    const stored = localStorage.getItem("myNotes");
-    const notes = stored ? JSON.parse(stored) : [];
-    notes.push(note);
-    localStorage.setItem("myNotes", JSON.stringify(notes));
+      // Call backend API to create note
+      const response = await createNote(
+        currentUser.email,
+        title.trim(),
+        description.trim(),
+        module
+      );
+      
+      if (!response.ok) {
+        message.error(response.error || "Failed to create note.");
+        return;
+      }
 
-    message.success("Note created successfully!");
-    setTimeout(() => navigate("/my-notes"), 500);
+      message.success("Note created successfully!");
+      setTimeout(() => navigate("/my-notes"), 500);
+    } catch (error) {
+      console.error("Error creating note:", error);
+      message.error("Failed to create note. Please try again.");
+    }
   };
 
   return (

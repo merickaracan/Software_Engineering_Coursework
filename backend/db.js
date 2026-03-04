@@ -23,7 +23,10 @@ const cloudConnection = mysql.createPool({
 });
 
 const cloudDb = cloudConnection.promise();
-let isCloudConnected = true;
+if (cloudConnection) {
+  console.log("✅ Connected to cloud database");
+}
+let isCloudConnected = false;
 
 /**
  * Database wrapper with automatic failover [for development only]
@@ -34,7 +37,6 @@ const dbProxy = {
     if (isCloudConnected) {
       try {
         const result = await cloudDb.query(sql, params);
-        console.log("✅ Cloud DB query successful");
         return result;
       } catch (err) {
         console.error("❌ Cloud database error:", err.message);

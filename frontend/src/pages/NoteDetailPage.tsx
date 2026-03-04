@@ -7,33 +7,35 @@ import {
   Tag,
   Button,
   Empty,
-  List,
   Space,
   Popconfirm,
   message,
+  Spin,
 } from "antd";
 import {
   ArrowLeftOutlined,
   EditOutlined,
   DeleteOutlined,
   FileTextOutlined,
-  PaperClipOutlined,
   CalendarOutlined,
 } from "@ant-design/icons";
 import PageLayout from "../Components/PageHeader";
 import { useTheme } from "../Components/ThemeContext";
+import { getNoteById, deleteNote } from "../api/notes";
 
 const { Title, Text, Paragraph } = Typography;
 const { Content } = Layout;
 
 interface Note {
   id: string;
+  owner_id: number;
+  owner_email: string;
   title: string;
-  description: string;
+  note_data: string;
   module: string;
-  files: string[];
-  createdAt: string;
-  ownerEmail: string;
+  is_verified: number;
+  created_at: string;
+  updated_at: string;
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -51,27 +53,58 @@ const NoteDetailPage: React.FC = () => {
   const { isDark } = useTheme();
   const [note, setNote] = useState<Note | null | undefined>(undefined);
   const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem("myNotes");
-    const notes: Note[] = stored ? JSON.parse(stored) : [];
-    const found = notes.find((n) => n.id === id) ?? null;
-    setNote(found);
+    const fetchNote = async () => {
+      if (!id) {
+        setNote(null);
+        setLoading(false);
+        return;
+      }
 
-    if (found) {
-      const storedUser = localStorage.getItem("user");
-      const currentUser = storedUser ? JSON.parse(storedUser) : null;
-      // If ownerEmail is absent (note predates ownership feature), any logged-in user can edit
-      setIsOwner(!found.ownerEmail || currentUser?.email === found.ownerEmail);
-    }
+      try {
+        const response = await getNoteById(id);
+        
+        if (response.ok && response.data && response.data.length > 0) {
+          const foundNote = response.data[0];
+          setNote(foundNote);
+
+          const storedUser = localStorage.getItem("user");
+          const currentUser = storedUser ? JSON.parse(storedUser) : null;
+          // Check if current user is the owner
+          setIsOwner(currentUser?.email === foundNote.owner_email);
+        } else {
+          setNote(null);
+        }
+      } catch (error) {
+        console.error("Error fetching note:", error);
+        setNote(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNote();
   }, [id]);
 
-  const handleDelete = () => {
-    const stored = localStorage.getItem("myNotes");
-    const notes: Note[] = stored ? JSON.parse(stored) : [];
-    localStorage.setItem("myNotes", JSON.stringify(notes.filter((n) => n.id !== id)));
-    message.success("Note deleted.");
-    navigate("/my-notes");
+  const handleDelete = async () => {
+    try {
+      if (!id) return;
+      
+      const response = await deleteNote(id);
+      
+      if (!response.ok) {
+        message.error(response.error || "Failed to delete note.");
+        return;
+      }
+      
+      message.success("Note deleted successfully.");
+      setTimeout(() => navigate("/my-notes"), 500);
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      message.error("Failed to delete note. Please try again.");
+    }
   };
 
   const cardStyle: React.CSSProperties = {
@@ -94,6 +127,16 @@ const NoteDetailPage: React.FC = () => {
             Back to My Notes
           </Button>
           <Empty description="Note not found." />
+        </Content>
+      </PageLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <Content style={{ padding: "32px" }}>
+          <Spin size="large" tip="Loading note..." style={{ marginTop: 48 }} />
         </Content>
       </PageLayout>
     );
@@ -161,7 +204,7 @@ const NoteDetailPage: React.FC = () => {
                 </Tag>
                 <Text type="secondary" style={{ fontSize: 13 }}>
                   <CalendarOutlined style={{ marginRight: 6 }} />
-                  {new Date(note.createdAt).toLocaleDateString(undefined, {
+                  {new Date(note.created_at).toLocaleDateString(undefined, {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -170,41 +213,16 @@ const NoteDetailPage: React.FC = () => {
               </div>
             </Card>
 
-            {/* Description */}
-            <Card title="Description" style={cardStyle}>
-              {note.description ? (
-                <Paragraph style={{ fontSize: 15, margin: 0 }}>
-                  {note.description}
+            {/* Content */}
+            <Card title="Content" style={cardStyle}>
+              {note.note_data ? (
+                <Paragraph style={{ fontSize: 15, margin: 0, whiteSpace: "pre-wrap" }}>
+                  {note.note_data}
                 </Paragraph>
               ) : (
-                <Text type="secondary">No description provided.</Text>
+                <Text type="secondary">No content provided.</Text>
               )}
             </Card>
-
-            {/* Attached files */}
-            {note.files.length > 0 && (
-              <Card
-                title={
-                  <span>
-                    <PaperClipOutlined style={{ marginRight: 8 }} />
-                    Attached Files
-                  </span>
-                }
-                style={cardStyle}
-              >
-                <List
-                  dataSource={note.files}
-                  renderItem={(fileName) => (
-                    <List.Item>
-                      <Text>
-                        <PaperClipOutlined style={{ marginRight: 8, color: isDark ? "#4da3ff" : "#0b5ed7" }} />
-                        {fileName}
-                      </Text>
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            )}
           </>
         )}
       </Content>

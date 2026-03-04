@@ -4,7 +4,10 @@ const db = require("../db");
 
 router.get("/notes/:id",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM notes WHERE id = ?",[req.params.id]);
+        const [rows] = await db.query(
+            "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE notes.id = ?",
+            [req.params.id]
+        );
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {
@@ -14,7 +17,10 @@ router.get("/notes/:id",async (req,res) =>{
 
 router.get("/notes/module/:module",async (req,res) =>{
     try{
-        const [rows] = await db.query("SELECT * FROM notes WHERE module = ?",[req.params.module]);
+        const [rows] = await db.query(
+            "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE notes.module = ?",
+            [req.params.module]
+        );
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {
@@ -29,7 +35,10 @@ router.get("/notes/email/:email",async (req,res) =>{
             return res.status(404).json({ ok: false, error: "User not found" });
         }
         const owner_id = userRows[0].id;
-        const [rows] = await db.query("SELECT * FROM notes WHERE owner_id = ?",[owner_id]);
+        const [rows] = await db.query(
+            "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE notes.owner_id = ?",
+            [owner_id]
+        );
         res.status(200).json({ ok: true, data: rows });
         }
     catch (err) {

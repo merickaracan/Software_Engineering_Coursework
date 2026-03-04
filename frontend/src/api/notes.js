@@ -70,13 +70,13 @@ const getNotesByEmail = async (email) => {
 /**
  * Creates a new note
  * @param {string} ownerEmail - Note creator's email
+ * @param {string} title - Note title
  * @param {string} noteData - Note content
  * @param {string} module - Module code
- * @param {number} [isVerified=0] - Verification status (0 or 1)
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
+const createNote = async (ownerEmail, title, noteData, module) => {
     try {
         const response = await fetch("/api/notes", {
             method: "POST",
@@ -85,10 +85,10 @@ const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
             },
             credentials: "include",
             body: JSON.stringify({
-                ownerEmail,
-                noteData,
-                module,
-                isVerified
+                owner_email: ownerEmail,
+                title: title,
+                note_data: noteData,
+                module: module
             })
         });
         const data = await response.json();
@@ -102,12 +102,13 @@ const createNote = async (ownerEmail, noteData, module, isVerified = 0) => {
 /**
  * Updates an existing note
  * @param {number} id - Note ID
+ * @param {string|null} [title=null] - New note title (optional)
  * @param {string|null} [noteData=null] - New note content (optional)
  * @param {string|null} [module=null] - New module code (optional)
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const updateNote = async (id, noteData = null, module = null) => {
+const updateNote = async (id, title = null, noteData = null, module = null) => {
     try {
         const response = await fetch(`/api/notes/${id}`, {
             method: "PUT",
@@ -116,8 +117,9 @@ const updateNote = async (id, noteData = null, module = null) => {
             },
             credentials: "include",
             body: JSON.stringify({
-                noteData,
-                module
+                title: title,
+                note_data: noteData,
+                module: module
             })
         });
         const data = await response.json();

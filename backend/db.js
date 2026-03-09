@@ -27,7 +27,7 @@ let isCloudConnected = false;
 if (cloudConnection && isCloudConnected) {
   console.log("✅ Connected to cloud database");
 } else {
-  console.warn("⚠️  Using local SQLite fallback");
+  console.log("⚠️  Using local SQLite fallback");
 }
 
 /**
@@ -41,15 +41,15 @@ const dbProxy = {
         const result = await cloudDb.query(sql, params);
         return result;
       } catch (err) {
-        console.error("❌ Cloud database error:", err.message);
-        console.warn("⚠️  Switching to local database fallback...");
+        console.log("❌ Cloud database error:", err.message);
+        console.log("⚠️  Switching to local database fallback...");
         isCloudConnected = false;
         
         // Fallback to local database
         try {
           return await localDb.query(sql, params);
         } catch (localErr) {
-          console.error("❌ Local database error:", localErr.message);
+          console.log("❌ Local database error:", localErr.message);
           throw localErr;
         }
       }
@@ -58,7 +58,7 @@ const dbProxy = {
       try {
         return await localDb.query(sql, params);
       } catch (err) {
-        console.error("❌ Local database error:", err.message);
+        console.log("❌ Local database error:", err.message);
         throw err;
       }
     }

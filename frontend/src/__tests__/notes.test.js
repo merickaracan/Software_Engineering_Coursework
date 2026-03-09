@@ -8,6 +8,7 @@ import {
   verifyNote,
   unverifyNote,
   deleteNote,
+  searchNotes,
 } from "../api/notes";
 
 // Mock fetch globally
@@ -102,17 +103,18 @@ describe("notes API", () => {
         json: async () => mockResponse,
       });
 
-      const result = await createNote("user@bath.ac.uk", "My note content", "M1", 0);
+      const result = await createNote("user@bath.ac.uk", "My Note Title", "My note content", "M1", null);
 
       expect(fetch).toHaveBeenCalledWith("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          ownerEmail: "user@bath.ac.uk",
-          noteData: "My note content",
+          owner_email: "user@bath.ac.uk",
+          title: "My Note Title",
+          note_data: "My note content",
           module: "M1",
-          isVerified: 0,
+          file: null,
         }),
       });
       expect(result).toEqual(mockResponse);
@@ -121,7 +123,7 @@ describe("notes API", () => {
     it("should handle creation errors", async () => {
       fetch.mockRejectedValueOnce(new Error("Creation failed"));
 
-      await expect(createNote("user@bath.ac.uk", "Note", "M1")).rejects.toThrow("Creation failed");
+      await expect(createNote("user@bath.ac.uk", "Title", "Note", "M1")).rejects.toThrow("Creation failed");
     });
   });
 
@@ -136,15 +138,17 @@ describe("notes API", () => {
         json: async () => mockResponse,
       });
 
-      const result = await updateNote(1, "Updated content", "M2");
+      const result = await updateNote(1, "Updated Title", "Updated content", "M2", null);
 
       expect(fetch).toHaveBeenCalledWith("/api/notes/1", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          noteData: "Updated content",
+          title: "Updated Title",
+          note_data: "Updated content",
           module: "M2",
+          file: null,
         }),
       });
       expect(result).toEqual(mockResponse);
@@ -237,6 +241,113 @@ describe("notes API", () => {
       fetch.mockRejectedValueOnce(new Error("Delete failed"));
 
       await expect(deleteNote(1)).rejects.toThrow("Delete failed");
+    });
+  });
+
+  describe("searchNotes", () => {
+    it("should search notes by title successfully", async () => {
+      const mockNotes = {
+        ok: true,
+        data: [{ id: 1, title: "Software Engineering Notes", module: "se" }],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockNotes,
+      });
+
+      const result = await searchNotes("Software", "");
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/search?title=Software"),
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        }
+      );
+      expect(result).toEqual(mockNotes);
+    });
+
+    it("should search notes by author successfully", async () => {
+      const mockNotes = {
+        ok: true,
+        data: [{ id: 1, ownerEmail: "user@bath.ac.uk" }],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockNotes,
+      });
+
+      const result = await searchNotes("", "user@bath.ac.uk");
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/search?author=user%40bath.ac.uk"),
+        expect.any(Object)
+      );
+      expect(result).toEqual(mockNotes);
+    });
+
+    it("should search notes by both title and author", async () => {
+      const mockNotes = {
+        ok: true,
+        data: [{ id: 1, title: "ML Notes", ownerEmail: "user@bath.ac.uk" }],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockNotes,
+      });
+
+      const result = await searchNotes("ML", "user@bath.ac.uk");
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("title=ML"),
+        expect.any(Object)
+      );
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("author=user%40bath.ac.uk"),
+        expect.any(Object)
+      );
+      expect(result).toEqual(mockNotes);
+    });
+
+    it("should handle empty search results", async () => {
+      const mockResponse = {
+        ok: true,
+        data: [],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockResponse,
+      });
+
+      const result = await searchNotes("Nonexistent", "");
+
+      expect(result.data).toEqual([]);
+    });
+
+    it("should handle search errors", async () => {
+      fetch.mockRejectedValueOnce(new Error("Search failed"));
+
+      await expect(searchNotes("test", "")).rejects.toThrow("Search failed");
+    });
+
+    it("should search with empty parameters", async () => {
+      const mockNotes = {
+        ok: true,
+        data: [{ id: 1 }, { id: 2 }],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockNotes,
+      });
+
+      const result = await searchNotes("", "");
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/search"),
+        expect.any(Object)
+      );
+      expect(result).toEqual(mockNotes);
     });
   });
 });

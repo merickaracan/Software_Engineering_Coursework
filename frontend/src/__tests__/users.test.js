@@ -20,7 +20,7 @@ describe("users API", () => {
         json: async () => mockResponse,
       });
 
-      const result = await createUser("user@bath.ac.uk", "password123", 0, 0);
+      const result = await createUser("user@bath.ac.uk", "Test User", "password123", 0, 0);
 
       expect(fetch).toHaveBeenCalledWith("/api/users", {
         method: "POST",
@@ -29,8 +29,9 @@ describe("users API", () => {
         },
         body: JSON.stringify({
           email: "user@bath.ac.uk",
-          password: "password123",
-          lecturer: 0,
+          name: "Test User",
+          password_hash: "password123",
+          is_lecturer: 0,
           points: 0,
         }),
       });
@@ -41,7 +42,7 @@ describe("users API", () => {
       const mockError = new Error("Network error");
       fetch.mockRejectedValueOnce(mockError);
 
-      await expect(createUser("user@bath.ac.uk", "password123")).rejects.toThrow("Network error");
+      await expect(createUser("user@bath.ac.uk", "Test User", "password123")).rejects.toThrow("Network error");
     });
   });
 
@@ -86,7 +87,7 @@ describe("users API", () => {
         json: async () => mockResponse,
       });
 
-      const result = await updateUser("user@bath.ac.uk", "newpass123", 1, 150);
+      const result = await updateUser("user@bath.ac.uk", "Updated User", "newpass123", 1, 150);
 
       expect(fetch).toHaveBeenCalledWith("/api/users/user@bath.ac.uk", {
         method: "PUT",
@@ -95,8 +96,9 @@ describe("users API", () => {
         },
         credentials: "include",
         body: JSON.stringify({
-          password: "newpass123",
-          lecturer: 1,
+          name: "Updated User",
+          password_hash: "newpass123",
+          is_lecturer: 1,
           points: 150,
         }),
       });
@@ -110,7 +112,7 @@ describe("users API", () => {
         json: async () => mockResponse,
       });
 
-      await updateUser("user@bath.ac.uk", null, 1, null);
+      await updateUser("user@bath.ac.uk", null, null, 1, null);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining("/api/users/user@bath.ac.uk"),

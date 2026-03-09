@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "../components/ThemeContext";
 import Profile from "../pages/Profile";
@@ -48,7 +48,7 @@ describe("Profile", () => {
     expect(screen.getAllByText("user@bath.ac.uk").length).toBeGreaterThan(0);
   });
 
-  it("clears user and navigates on logout", () => {
+  it("clears user and navigates on logout", async () => {
     localStorage.setItem(
       "user",
       JSON.stringify({ name: "Test User", email: "user@bath.ac.uk" })
@@ -73,7 +73,9 @@ describe("Profile", () => {
     const [logoutButton] = screen.getAllByRole("button", { name: /log out/i });
     fireEvent.click(logoutButton);
 
-    expect(localStorage.getItem("user")).toBeNull();
+    await waitFor(() => {
+      expect(localStorage.getItem("user")).toBeNull();
+    });
     expect(mockNavigate).toHaveBeenCalledWith("/login");
   });
 });

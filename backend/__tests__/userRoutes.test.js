@@ -1,50 +1,99 @@
 const request = require("supertest");
 const app = require("../app");
-const db = require("../db");
+const { getUserPublic, getUserById } = require("../services/userService");
+const jwt = require("jsonwebtoken");
 
-jest.mock("../db");
+jest.mock("../services/userService");
+
+const JWT_SECRET = process.env.JWT_SECRET || "default";
+
+const createToken = (email) => {
+  return jwt.sign({ email }, JWT_SECRET, { expiresIn: "24h" });
+};
 
 describe("User Routes", () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe("GET /api/users/:email", () => {
-    it("should fetch a user by email", async () => {
-      const email = "user@bath.ac.uk";
+  describe("GET /api/users/id/:id", () => {
+    it("should fetch a user by ID (public data only)", async () => {
       const mockUser = {
         id: 1,
         name: "Test User",
-        email,
-        password_hash: "hashed_password",
+        email: "user@bath.ac.uk",
         is_lecturer: 0,
         points: 100,
+        profile_picture: null,
       };
 
-      db.query.mockResolvedValueOnce([[mockUser]]);
+      getUserById.mockResolvedValueOnce(mockUser);
 
-      const res = await request(app).get(`/api/users/${email}`);
+      const res = await request(app).get("/api/users/id/1");
 
       expect(res.statusCode).toBe(200);
       expect(res.body.ok).toBe(true);
       expect(res.body.data[0]).toEqual(mockUser);
-      expect(db.query).toHaveBeenCalledWith("SELECT * FROM user_data WHERE email = ?", [
-        email,
-      ]);
+      // Verify password_hash is not included
+      expect(res.body.data[0]).not.toHaveProperty("password_hash");
+      expect(getUserById).toHaveBeenCalledWith("1");
     });
 
-    it("should return empty array if user not found", async () => {
-      db.query.mockResolvedValueOnce([[]]);
+    it("should return 404 if user not found", async () => {
+      getUserById.mockResolvedValueOnce(null);
 
-      const res = await request(app).get("/api/users/notfound@bath.ac.uk");
+      const res = await request(app).get("/api/users/id/999");
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.data).toEqual([]);
+      expect(res.statusCode).toBe(404);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.message).toBe("User not found");
     });
 
     it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB connection failed"));
+      getUserById.mockRejectedValueOnce(new Error("DB error"));
+
+      const res = await request(app).get("/api/users/id/1");
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+  });
+
+  describe("GET /api/users/:email", () => {
+    it("should fetch a user by email (public data only)", async () => {
+      const mockUser = {
+        id: 1,
+        name: "Test User",
+        email: "user@bath.ac.uk",
+        is_lecturer: 0,
+        points: 100,
+        profile_picture: null,
+      };
+
+      getUserPublic.mockResolvedValueOnce(mockUser);
+
+      const res = await request(app).get("/api/users/user@bath.ac.uk");
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data[0]).toEqual(mockUser);
+      // Verify password_hash is NOT included (critical security)
+      expect(res.body.data[0]).not.toHaveProperty("password_hash");
+      expect(getUserPublic).toHaveBeenCalledWith("user@bath.ac.uk");
+    });
+
+    it("should return 404 if user not found", async () => {
+      getUserPublic.mockResolvedValueOnce(null);
+
+      const res = await request(app).get("/api/users/notfound@bath.ac.uk");
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.message).toBe("User not found");
+    });
+
+    it("should handle database errors gracefully", async () => {
+      getUserPublic.mockRejectedValueOnce(new Error("DB error"));
 
       const res = await request(app).get("/api/users/user@bath.ac.uk");
 
@@ -53,141 +102,151 @@ describe("User Routes", () => {
     });
   });
 
-  describe("POST /api/users", () => {
-    it("should create a new user", async () => {
-      const userData = {
-        email: "newuser@bath.ac.uk",
-        name: "New User",
-        password_hash: "hashed_password_123",
-        is_lecturer: 0,
-        points: 0,
-      };
+  describe("PUT /api/users/:email/profile-picture", () => {
+    it("should require authentication", async () => {
+      const res = await request(app)
+        .put("/api/users/user@bath.ac.uk/profile-picture")
+        .send({ profile_picture: "base64data" });
 
-      db.query.mockResolvedValueOnce([{ insertId: 1, lastID: 1 }]);
-
-      const res = await request(app).post("/api/users").send(userData);
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("User created");
-      expect(res.body.insertId).toBe(1);
+      expect(res.statusCode).toBe(401);
+      expect(res.body.message).toContain("Please log in");
     });
 
-    it("should handle missing required fields", async () => {
-      const incompleteUser = {
-        email: "user@bath.ac.uk",
-        // missing password_hash
-      };
+    it("should require ownership (cannot update others' profiles)", async () => {
+      const userEmail = "user1@bath.ac.uk";
+      const otherEmail = "user2@bath.ac.uk";
+      const token = createToken(userEmail);
 
-      db.query.mockResolvedValueOnce([{ insertId: 2, lastID: 2 }]);
+      const res = await request(app)
+        .put(`/api/users/${otherEmail}/profile-picture`)
+        .set("Cookie", `token=${token}`)
+        .send({ profile_picture: "base64data" });
 
-      const res = await request(app).post("/api/users").send(incompleteUser);
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.ok).toBe(true);
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain("Unauthorized");
+      expect(res.body.message).toContain("can only update own");
     });
 
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("Duplicate email error"));
+    it("should return 404 if user not found", async () => {
+      const email = "user@bath.ac.uk";
+      const token = createToken(email);
 
-      const res = await request(app).post("/api/users").send({
-        email: "duplicate@bath.ac.uk",
-        password_hash: "password",
-      });
+      // Mock the updateUserProfile to return 0 affected rows (user not found)
+      const updateUserProfile = require("../services/userService").updateUserProfile;
+      updateUserProfile.mockResolvedValueOnce({ affectedRows: 0 });
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.ok).toBe(false);
+      const res = await request(app)
+        .put(`/api/users/${email}/profile-picture`)
+        .set("Cookie", `token=${token}`)
+        .send({ profile_picture: "base64data" });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body.message).toBe("User not found");
     });
   });
 
   describe("PUT /api/users/:email", () => {
-    it("should update a user", async () => {
-      const email = "user@bath.ac.uk";
-      const updateData = {
-        name: "Updated User",
-        password_hash: "new_hashed_password",
-        is_lecturer: 1,
-        points: 150,
-      };
+    it("should require authentication", async () => {
+      const res = await request(app)
+        .put("/api/users/user@bath.ac.uk")
+        .send({ name: "Updated Name" });
 
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-
-      const res = await request(app).put(`/api/users/${email}`).send(updateData);
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("User updated");
+      expect(res.statusCode).toBe(401);
     });
 
-    it("should return 404 if user not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
+    it("should require ownership (cannot update others' accounts)", async () => {
+      const userEmail = "user1@bath.ac.uk";
+      const otherEmail = "user2@bath.ac.uk";
+      const token = createToken(userEmail);
 
-      const res = await request(app).put("/api/users/nonexistent@bath.ac.uk").send({});
+      const res = await request(app)
+        .put(`/api/users/${otherEmail}`)
+        .set("Cookie", `token=${token}`)
+        .send({ name: "Hacked Name" });
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error).toBe("User not found");
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain("can only update own profile");
     });
 
-    it("should handle partial updates", async () => {
+    it("should reject invalid name (too short)", async () => {
       const email = "user@bath.ac.uk";
-
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+      const token = createToken(email);
 
       const res = await request(app)
         .put(`/api/users/${email}`)
-        .send({ points: 200 });
+        .set("Cookie", `token=${token}`)
+        .send({ name: "A" }); // Less than 2 characters
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.ok).toBe(true);
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain("at least 2 characters");
     });
 
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB update failed"));
+    it("should return 404 if user not found", async () => {
+      const email = "user@bath.ac.uk";
+      const token = createToken(email);
 
-      const res = await request(app).put("/api/users/user@bath.ac.uk").send({});
+      const updateUserProfile = require("../services/userService").updateUserProfile;
+      updateUserProfile.mockResolvedValueOnce({ affectedRows: 0 });
 
-      expect(res.statusCode).toBe(500);
-      expect(res.body.ok).toBe(false);
+      const res = await request(app)
+        .put(`/api/users/${email}`)
+        .set("Cookie", `token=${token}`)
+        .send({ name: "New Name" });
+
+      expect(res.statusCode).toBe(404);
     });
   });
 
   describe("DELETE /api/users/:email", () => {
-    it("should delete a user", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-
+    it("should require authentication", async () => {
       const res = await request(app).delete("/api/users/user@bath.ac.uk");
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.message).toContain("Please log in");
+    });
+
+    it("should require ownership (cannot delete others' accounts)", async () => {
+      const userEmail = "user1@bath.ac.uk";
+      const otherEmail = "user2@bath.ac.uk";
+      const token = createToken(userEmail);
+
+      const res = await request(app)
+        .delete(`/api/users/${otherEmail}`)
+        .set("Cookie", `token=${token}`);
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain("can only delete own");
+    });
+
+    it("should delete user account when user owns it", async () => {
+      const email = "user@bath.ac.uk";
+      const token = createToken(email);
+
+      const deleteUser = require("../services/userService").deleteUser;
+      deleteUser.mockResolvedValueOnce({ affectedRows: 1 });
+
+      const res = await request(app)
+        .delete(`/api/users/${email}`)
+        .set("Cookie", `token=${token}`);
 
       expect(res.statusCode).toBe(200);
       expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("User deleted");
-      expect(db.query).toHaveBeenCalledWith("DELETE FROM user_data WHERE email = ?", [
-        "user@bath.ac.uk",
-      ]);
+      expect(res.body.message).toContain("deleted successfully");
     });
 
     it("should return 404 if user not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
+      const email = "user@bath.ac.uk";
+      const token = createToken(email);
 
-      const res = await request(app).delete("/api/users/nonexistent@bath.ac.uk");
+      const deleteUser = require("../services/userService").deleteUser;
+      deleteUser.mockResolvedValueOnce({ affectedRows: 0 });
+
+      const res = await request(app)
+        .delete(`/api/users/${email}`)
+        .set("Cookie", `token=${token}`);
 
       expect(res.statusCode).toBe(404);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error).toBe("User not found");
-    });
-
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB delete failed"));
-
-      const res = await request(app).delete("/api/users/user@bath.ac.uk");
-
-      expect(res.statusCode).toBe(500);
-      expect(res.body.ok).toBe(false);
+      expect(res.body.message).toBe("User not found");
     });
   });
 });
-
-
-
-
-

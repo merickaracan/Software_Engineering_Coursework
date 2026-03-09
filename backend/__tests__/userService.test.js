@@ -100,7 +100,12 @@ describe("userService", () => {
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await updateUser(email, "Updated Name", "new_password", 1, 200);
+      const result = await updateUser(email, {
+        name: "Updated Name",
+        password_hash: "new_password",
+        is_lecturer: 1,
+        points: 200
+      });
 
       expect(result).toEqual({ affectedRows: 1 });
       expect(db.query).toHaveBeenCalledWith(
@@ -109,24 +114,24 @@ describe("userService", () => {
       );
     });
 
-    it("should update user with partial fields (null values)", async () => {
+    it("should update user with partial fields (only name)", async () => {
       const email = "user@bath.ac.uk";
 
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await updateUser(email, null, null, 1, null);
+      const result = await updateUser(email, { name: "Updated Name" });
 
       expect(result).toEqual({ affectedRows: 1 });
       expect(db.query).toHaveBeenCalledWith(
         "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
-        [null, null, 1, null, email]
+        ["Updated Name", undefined, undefined, undefined, email]
       );
     });
 
     it("should throw error on database failure", async () => {
       db.query.mockRejectedValueOnce(new Error("Update failed"));
 
-      await expect(updateUser("user@bath.ac.uk", "password")).rejects.toThrow(
+      await expect(updateUser("user@bath.ac.uk", { name: "Test" })).rejects.toThrow(
         "Error updating user: Update failed"
       );
     });
@@ -152,6 +157,9 @@ describe("userService", () => {
       const result = await deleteUser("notfound@bath.ac.uk");
 
       expect(result).toEqual({ affectedRows: 0 });
+      expect(db.query).toHaveBeenCalledWith("DELETE FROM user_data WHERE email = ?", [
+        "notfound@bath.ac.uk",
+      ]);
     });
 
     it("should throw error on database failure", async () => {

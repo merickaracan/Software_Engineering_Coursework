@@ -52,6 +52,8 @@ describe("Register", () => {
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "Password123!" },
     });
+    fireEvent.mouseDown(screen.getByLabelText("Major"));
+    fireEvent.click(screen.getByText("Computer Science"));
     fireEvent.change(screen.getByLabelText("Confirm password"), {
       target: { value: "Password123!" },
     });

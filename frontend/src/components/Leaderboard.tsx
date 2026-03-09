@@ -34,8 +34,16 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
 
   useEffect(() => {
     const stored = localStorage.getItem("leaderboard");
-    if (stored) {
-      setLeaderboard(JSON.parse(stored));
+    if (!stored) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(stored);
+      setLeaderboard(Array.isArray(parsed) ? parsed : []);
+    } catch (error) {
+      console.error("Invalid leaderboard data in localStorage:", error);
+      setLeaderboard([]);
     }
   }, []);
 

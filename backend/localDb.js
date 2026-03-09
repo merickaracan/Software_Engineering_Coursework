@@ -30,17 +30,6 @@ const dbReadyPromise = new Promise((resolve, reject) => {
  */
 function initializeLocalDatabase() {
     return new Promise((resolve, reject) => {
-        let completed = 0;
-        const total = 5; // 4 tables + user_data schema migration check
-
-        const checkCompletion = () => {
-            completed++;
-            if (completed === total) {
-                console.log("Local database tables initialized");
-                resolve();
-            }
-        };
-
         // Create user_data table
         db.run(`
             CREATE TABLE IF NOT EXISTS user_data (
@@ -52,14 +41,7 @@ function initializeLocalDatabase() {
                 password_hash TEXT NOT NULL,
                 profile_picture TEXT
             )
-        `, (err) => {
-            if (err) {
-                console.error("Error creating user_data table:", err.message);
-                reject(err);
-            } else {
-                checkCompletion();
-            }
-        });
+        `);
 
         // Create notes table
         db.run(`
@@ -78,14 +60,7 @@ function initializeLocalDatabase() {
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (owner_id) REFERENCES user_data(id) ON DELETE CASCADE
             )
-        `, (err) => {
-            if (err) {
-                console.error("Error creating notes table:", err.message);
-                reject(err);
-            } else {
-                checkCompletion();
-            }
-        });
+        `);
 
         // Create suggestions table
         db.run(`
@@ -98,14 +73,7 @@ function initializeLocalDatabase() {
                 FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
                 FOREIGN KEY (commenter_id) REFERENCES user_data(id) ON DELETE CASCADE
             )
-        `, (err) => {
-            if (err) {
-                console.error("Error creating suggestions table:", err.message);
-                reject(err);
-            } else {
-                checkCompletion();
-            }
-        });
+        `);
 
         // Create note_ratings table
         db.run(`
@@ -118,42 +86,7 @@ function initializeLocalDatabase() {
                 FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
                 FOREIGN KEY (rater_id) REFERENCES user_data(id) ON DELETE CASCADE
             )
-        `, (err) => {
-            if (err) {
-                console.error("Error creating note_ratings table:", err.message);
-                reject(err);
-            } else {
-                checkCompletion();
-            }
-        });
-
-        const ensureUserDataColumns = () => {
-            db.all("PRAGMA table_info(user_data)", [], (pragmaErr, columns) => {
-                if (pragmaErr) {
-                    console.error("Error checking user_data schema:", pragmaErr.message);
-                    reject(pragmaErr);
-                    return;
-                }
-
-                const hasProfilePicture = Array.isArray(columns) && columns.some((col) => col.name === "profile_picture");
-                if (hasProfilePicture) {
-                    checkCompletion();
-                    return;
-                }
-
-                db.run("ALTER TABLE user_data ADD COLUMN profile_picture TEXT", (alterErr) => {
-                    if (alterErr) {
-                        console.error("Error adding profile_picture column:", alterErr.message);
-                        reject(alterErr);
-                        return;
-                    }
-
-                    checkCompletion();
-                });
-            });
-        };
-
-        ensureUserDataColumns();
+        `);
     });
 }
 

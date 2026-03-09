@@ -35,6 +35,12 @@ describe("Login", () => {
     mockFetch.mockResolvedValueOnce({
       json: async () => ({ ok: true }),
     });
+    mockFetch.mockResolvedValueOnce({
+      json: async () => ({
+        ok: true,
+        data: [{ id: 1, name: "Test User", email: "user@bath.ac.uk" }],
+      }),
+    });
 
     render(
       <MemoryRouter>
@@ -68,7 +74,9 @@ describe("Login", () => {
       });
     });
 
-    expect(setIsAuthenticated).toHaveBeenCalledWith(true);
+    await waitFor(() => {
+      expect(setIsAuthenticated).toHaveBeenCalledWith(true);
+    });
     expect(message.success).toHaveBeenCalled();
   });
 

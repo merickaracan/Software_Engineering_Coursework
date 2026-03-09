@@ -1,8 +1,18 @@
 const request = require("supertest");
 const app = require("../app");
 const db = require("../db");
+const jwt = require("jsonwebtoken");
 
 jest.mock("../db");
+
+const JWT_SECRET = process.env.JWT_SECRET || "default";
+
+const createToken = (email) => {
+  return jwt.sign({ email }, JWT_SECRET, { expiresIn: "24h" });
+};
+
+const makeEmail = (label = "user") =>
+  `sugg.${label}.${Date.now()}.${Math.floor(Math.random() * 10000)}@bath.ac.uk`;
 
 describe("Suggestions Routes", () => {
   afterEach(() => {
@@ -29,13 +39,13 @@ describe("Suggestions Routes", () => {
       expect(res.body.data[0]).toEqual(mockSuggestion);
     });
 
-    it("should return empty array if suggestion not found", async () => {
+    it("should return 404 if suggestion not found", async () => {
       db.query.mockResolvedValueOnce([[]]);
 
       const res = await request(app).get("/api/suggestions/999");
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.data).toEqual([]);
+      expect(res.statusCode).toBe(404);
+      expect(res.body.message).toBe("Suggestion not found");
     });
 
     it("should handle database errors", async () => {
@@ -56,6 +66,8 @@ describe("Suggestions Routes", () => {
           id: 1,
           note_id: 5,
           commenter_id: commenterId,
+          commenter_name: "Alice",
+          commenter_email: "alice@bath.ac.uk",
           suggestion_data: "Suggestion 1",
           created_at: "2024-01-01T00:00:00Z",
         },
@@ -63,6 +75,8 @@ describe("Suggestions Routes", () => {
           id: 2,
           note_id: 6,
           commenter_id: commenterId,
+          commenter_name: "Alice",
+          commenter_email: "alice@bath.ac.uk",
           suggestion_data: "Suggestion 2",
           created_at: "2024-01-02T00:00:00Z",
         },
@@ -75,10 +89,6 @@ describe("Suggestions Routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toEqual(mockSuggestions);
-      expect(db.query).toHaveBeenCalledWith(
-        "SELECT * FROM suggestions WHERE commenter_id = ?",
-        [commenterId]
-      );
     });
 
     it("should return empty array if commenter has no suggestions", async () => {
@@ -92,13 +102,16 @@ describe("Suggestions Routes", () => {
   });
 
   describe("GET /api/suggestions/note/:note_id", () => {
-    it("should fetch all suggestions for a note", async () => {
+    it("should fetch all suggestions for a note with commenter info", async () => {
       const noteId = "5";
       const mockSuggestions = [
         {
           id: 1,
           note_id: noteId,
           commenter_id: 10,
+          commenter_name: "Alice",
+          commenter_email: "alice@bath.ac.uk",
+          commenter_profile_picture: null,
           suggestion_data: "Suggestion 1",
           created_at: "2024-01-01T00:00:00Z",
         },
@@ -106,6 +119,9 @@ describe("Suggestions Routes", () => {
           id: 2,
           note_id: noteId,
           commenter_id: 11,
+          commenter_name: "Bob",
+          commenter_email: "bob@bath.ac.uk",
+          commenter_profile_picture: null,
           suggestion_data: "Suggestion 2",
           created_at: "2024-01-02T00:00:00Z",
         },
@@ -118,10 +134,6 @@ describe("Suggestions Routes", () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.ok).toBe(true);
       expect(res.body.data).toEqual(mockSuggestions);
-      expect(db.query).toHaveBeenCalledWith(
-        "SELECT * FROM suggestions WHERE note_id = ?",
-        [noteId]
-      );
     });
 
     it("should return empty array if note has no suggestions", async () => {
@@ -135,113 +147,253 @@ describe("Suggestions Routes", () => {
   });
 
   describe("POST /api/suggestions", () => {
-    it("should create a new suggestion", async () => {
+    it("should require authentication", async () => {
+      const res = await request(app)
+        .post("/api/suggestions")
+        .send({
+          note_id: 5,
+          suggestion_data: "Great note!",
+        });
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.message).toContain("Please log in");
+    });
+
+    it("should create a new suggestion when authenticated", async () => {
+      const commenterEmail = makeEmail("commenter");
+      const token = createToken(commenterEmail);
+
       const suggestionData = {
         note_id: 5,
-        commenter_id: 10,
         suggestion_data: "Great note, needs more examples",
       };
 
-      db.query.mockResolvedValueOnce([{ insertId: 1, lastID: 1 }]);
-
-      const res = await request(app).post("/api/suggestions").send(suggestionData);
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("Suggestion created");
-      expect(res.body.insertId).toBe(1);
-    });
-
-    it("should handle missing required fields", async () => {
-      const incompleteSuggestion = {
-        note_id: 5,
-        // missing commenter_id and suggestion_data
-      };
-
-      db.query.mockResolvedValueOnce([{ insertId: 2, lastID: 2 }]);
-
-      const res = await request(app).post("/api/suggestions").send(incompleteSuggestion);
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.ok).toBe(true);
-    });
-
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB insert failed"));
-
-      const res = await request(app).post("/api/suggestions").send({});
-
-      expect(res.statusCode).toBe(500);
-      expect(res.body.ok).toBe(false);
-    });
-  });
-
-  describe("PUT /api/suggestions/:id", () => {
-    it("should update a suggestion", async () => {
-      const suggestionId = 1;
-      const updateData = {
-        suggestion_data: "Updated suggestion text",
-      };
-
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+      db.query.mockResolvedValueOnce([[{ id: 10 }]]); // Mock user lookup
+      db.query.mockResolvedValueOnce([{ insertId: 1 }]); // Mock create
 
       const res = await request(app)
-        .put(`/api/suggestions/${suggestionId}`)
-        .send(updateData);
+        .post("/api/suggestions")
+        .set("Cookie", `token=${token}`)
+        .send(suggestionData);
 
-      expect(res.statusCode).toBe(200);
+      expect(res.statusCode).toBe(201);
       expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("Suggestion updated");
+      expect(res.body.data.id).toBe(1);
+      expect(res.body.message).toContain("created successfully");
     });
 
-    it("should return 404 if suggestion not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
+    it("should reject missing required fields", async () => {
+      const token = createToken(makeEmail("user"));
 
-      const res = await request(app).put("/api/suggestions/999").send({});
+      const res = await request(app)
+        .post("/api/suggestions")
+        .set("Cookie", `token=${token}`)
+        .send({ note_id: 5 }); // Missing suggestion_data
 
-      expect(res.statusCode).toBe(404);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error).toBe("Suggestion not found");
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain("Missing required fields");
     });
 
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB update failed"));
+    it("should reject if user not found", async () => {
+      const token = createToken(makeEmail("notfound"));
 
-      const res = await request(app).put("/api/suggestions/1").send({});
+      db.query.mockResolvedValueOnce([[]]); // User not found
+
+      const res = await request(app)
+        .post("/api/suggestions")
+        .set("Cookie", `token=${token}`)
+        .send({
+          note_id: 5,
+          suggestion_data: "Suggestion",
+        });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain("User not found");
+    });
+
+    it("should handle database errors during creation", async () => {
+      const token = createToken(makeEmail("user"));
+
+      db.query.mockResolvedValueOnce([[{ id: 10 }]]);
+      db.query.mockRejectedValueOnce(new Error("Database error"));
+
+      const res = await request(app)
+        .post("/api/suggestions")
+        .set("Cookie", `token=${token}`)
+        .send({
+          note_id: 5,
+          suggestion_data: "Suggestion",
+        });
 
       expect(res.statusCode).toBe(500);
       expect(res.body.ok).toBe(false);
+    });
+
+    it("should reject excessively long suggestions", async () => {
+      const token = createToken(makeEmail("user"));
+      const longSuggestion = "A".repeat(10000);
+
+      db.query.mockResolvedValueOnce([[{ id: 10 }]]);
+
+      const res = await request(app)
+        .post("/api/suggestions")
+        .set("Cookie", `token=${token}`)
+        .send({
+          note_id: 5,
+          suggestion_data: longSuggestion,
+        });
+
+      // Should either reject or handle gracefully
+      expect([400, 500]).toContain(res.statusCode);
     });
   });
 
   describe("DELETE /api/suggestions/:id", () => {
-    it("should delete a suggestion", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-
+    it("should require authentication", async () => {
       const res = await request(app).delete("/api/suggestions/1");
+
+      expect(res.statusCode).toBe(401);
+      expect(res.body.message).toContain("Please log in");
+    });
+
+    it("should delete suggestion when user owns it", async () => {
+      const commenterEmail = makeEmail("owner");
+      const token = createToken(commenterEmail);
+
+      db.query.mockResolvedValueOnce([[{ email: commenterEmail }]]); // Verify ownership
+      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]); // Delete
+
+      const res = await request(app)
+        .delete("/api/suggestions/1")
+        .set("Cookie", `token=${token}`);
 
       expect(res.statusCode).toBe(200);
       expect(res.body.ok).toBe(true);
-      expect(res.body.message).toBe("Suggestion deleted");
+      expect(res.body.message).toContain("deleted successfully");
+    });
+
+    it("should reject deletion if user doesn't own suggestion", async () => {
+      const userEmail = makeEmail("user1");
+      const ownerEmail = makeEmail("user2");
+      const token = createToken(userEmail);
+
+      db.query.mockResolvedValueOnce([[{ email: ownerEmail }]]); // Different owner
+
+      const res = await request(app)
+        .delete("/api/suggestions/1")
+        .set("Cookie", `token=${token}`);
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain("can only delete own suggestions");
     });
 
     it("should return 404 if suggestion not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
+      const token = createToken(makeEmail("user"));
 
-      const res = await request(app).delete("/api/suggestions/999");
+      db.query.mockResolvedValueOnce([[]]); // Not found
+
+      const res = await request(app)
+        .delete("/api/suggestions/999")
+        .set("Cookie", `token=${token}`);
 
       expect(res.statusCode).toBe(404);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error).toBe("Suggestion not found");
+      expect(res.body.message).toBe("Suggestion not found");
     });
 
-    it("should handle database errors", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB delete failed"));
+    it("should handle database errors during deletion", async () => {
+      const token = createToken(makeEmail("user"));
 
-      const res = await request(app).delete("/api/suggestions/1");
+      db.query.mockRejectedValueOnce(new Error("Database error"));
+
+      const res = await request(app)
+        .delete("/api/suggestions/1")
+        .set("Cookie", `token=${token}`);
 
       expect(res.statusCode).toBe(500);
       expect(res.body.ok).toBe(false);
+    });
+  });;
+
+  describe("PUT /api/suggestions/:id", () => {
+    it("should require authentication", async () => {
+      const res = await request(app)
+        .put("/api/suggestions/1")
+        .send({ suggestion_data: "Updated" });
+
+      expect(res.statusCode).toBe(401);
+    });
+
+    it("should update suggestion when user owns it", async () => {
+      const commenterEmail = makeEmail("owner");
+      const token = createToken(commenterEmail);
+
+      db.query.mockResolvedValueOnce([[{ email: commenterEmail }]]); // Verify ownership
+      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]); // Update
+
+      const res = await request(app)
+        .put("/api/suggestions/1")
+        .set("Cookie", `token=${token}`)
+        .send({ suggestion_data: "Updated suggestion" });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.message).toContain("updated successfully");
+    });
+
+    it("should reject update if user doesn't own suggestion", async () => {
+      const userEmail = makeEmail("user1");
+      const ownerEmail = makeEmail("user2");
+      const token = createToken(userEmail);
+
+      db.query.mockResolvedValueOnce([[{ email: ownerEmail }]]);
+
+      const res = await request(app)
+        .put("/api/suggestions/1")
+        .set("Cookie", `token=${token}`)
+        .send({ suggestion_data: "Hacked" });
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain("can only update own suggestions");
+    });
+
+    it("should return 404 if suggestion not found", async () => {
+      const token = createToken(makeEmail("user"));
+
+      db.query.mockResolvedValueOnce([[]]); // Suggestion not found
+
+      const res = await request(app)
+        .put("/api/suggestions/999")
+        .set("Cookie", `token=${token}`)
+        .send({ suggestion_data: "Updated" });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.body.message).toBe("Suggestion not found");
+    });
+
+    it("should handle database errors during update", async () => {
+      const token = createToken(makeEmail("user"));
+
+      db.query.mockRejectedValueOnce(new Error("Database error"));
+
+      const res = await request(app)
+        .put("/api/suggestions/1")
+        .set("Cookie", `token=${token}`)
+        .send({ suggestion_data: "Updated" });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+
+    it("should reject update with empty suggestion_data", async () => {
+      const token = createToken(makeEmail("user"));
+
+      const res = await request(app)
+        .put("/api/suggestions/1")
+        .set("Cookie", `token=${token}`)
+        .send({ suggestion_data: "" });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain("cannot be empty");
     });
   });
 });

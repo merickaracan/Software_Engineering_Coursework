@@ -68,12 +68,18 @@ function validateRegistration(data) {
 
 
 // Register User
+/**
+ * POST /register
+ * Registers a new user account
+ * @param {Object} body - { name, email, password, is_lecturer? }
+ * @returns {Object} { ok: boolean, errors?: string[], message?: string }
+ */
 router.post("/register", async (req, res) => {
   const { name, email, password, is_lecturer } = req.body;
 
   // Validate input
   const validationErrors = validateRegistration({ name, email, password });
-  
+
   if (validationErrors.length > 0) {
     return res.status(400).json({
       ok: false,
@@ -96,14 +102,31 @@ router.post("/register", async (req, res) => {
   const lecturerFlag = is_lecturer ? 1 : 0;
 
   // Add data to database
-  await createUser(email, name, hashedPassword, lecturerFlag);
+  try {
+    await createUser(email, name, hashedPassword, lecturerFlag);
 
-  res.json({
-    ok: true,
-    message: "Account created successfully",
-  });
-})
+    res.status(201).json({
+      ok: true,
+      message: "Account created successfully",
+    });
+  } catch (err) {
+    // Handle duplicate email errors from database (race condition)
+    if (err.message.includes("Duplicate")) {
+      return res.status(409).json({
+        ok: false,
+        errors: ["Email is already registered."],
+      });
+    }
+    throw err;
+  }
+});
 
+/**
+ * POST /login
+ * Authenticates a user and returns a JWT token in httpOnly cookie
+ * @param {Object} body - { email, password }
+ * @returns {Object} { ok: boolean, message: string }
+ */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -149,7 +172,11 @@ router.post("/login", async (req, res) => {
   });
 });
 
-// Logout User
+/**
+ * POST /logout
+ * Clears the authentication token
+ * @returns {Object} { ok: boolean, message: string }
+ */
 router.post("/logout", (req, res) => {
   res.clearCookie("token");
   res.json({
@@ -158,11 +185,16 @@ router.post("/logout", (req, res) => {
   });
 });
 
-
+/**
+ * GET /me
+ * Retrieves the current authenticated user's information
+ * Requires valid JWT token in cookies
+ * @returns {Object} { ok: boolean, user: { email: string } }
+ */
 router.get("/me", requireAuth, (req, res) => {
   res.json({
     ok: true,
-    user: req.user
+    user: req.user,
   });
 });
 

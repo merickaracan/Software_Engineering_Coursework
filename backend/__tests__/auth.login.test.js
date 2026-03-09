@@ -1,18 +1,16 @@
 const request = require("supertest");
 const app = require("../app");
+const bcrypt = require("bcrypt");
+
+jest.mock("../services/userService");
 
 const makeEmail = (label = "user") =>
 	`login.${label}.${Date.now()}.${Math.floor(Math.random() * 10000)}@bath.ac.uk`;
 
-async function registerUser(email, password = "Password123!") {
-	return request(app).post("/api/register").send({
-		name: "Test User",
-		email,
-		password,
-	});
-}
-
 describe("Login tests:", () => {
+	afterEach(() => {
+		jest.clearAllMocks();
+	});
     
 	test("Rejects missing email", async () => {
 		const res = await request(app)
@@ -25,6 +23,9 @@ describe("Login tests:", () => {
 	});
 
 	test("Rejects unknown email", async () => {
+		const { getUser } = require("../services/userService");
+		getUser.mockResolvedValueOnce(null); // User not found
+
 		const res = await request(app)
 			.post("/api/login")
 			.send({ email: makeEmail("unknown"), password: "Password123!" });
@@ -35,8 +36,16 @@ describe("Login tests:", () => {
 	});
 
 	test("Rejects wrong password", async () => {
+		const { getUser } = require("../services/userService");
 		const email = makeEmail("wrongpw");
-		const registerRes = await registerUser(email, "Password123!");
+		const hashedPassword = await bcrypt.hash("Password123!", 12);
+
+		getUser.mockResolvedValueOnce({
+			id: 1,
+			email,
+			name: "Test User",
+			password_hash: hashedPassword,
+		});
 
 		const res = await request(app)
 			.post("/api/login")
@@ -48,8 +57,16 @@ describe("Login tests:", () => {
 	});
 
 	test("Logs in user and sets token cookie", async () => {
+		const { getUser } = require("../services/userService");
 		const email = makeEmail("valid");
-		await registerUser(email, "Password123!");
+		const hashedPassword = await bcrypt.hash("Password123!", 12);
+
+		getUser.mockResolvedValueOnce({
+			id: 1,
+			email,
+			name: "Test User",
+			password_hash: hashedPassword,
+		});
 
 		const res = await request(app)
 			.post("/api/login")
@@ -67,8 +84,16 @@ describe("Login tests:", () => {
 	});
 
 	test("Accesses /me with valid token cookie", async () => {
+		const { getUser } = require("../services/userService");
 		const email = makeEmail("me");
-		await registerUser(email, "Password123!");
+		const hashedPassword = await bcrypt.hash("Password123!", 12);
+
+		getUser.mockResolvedValueOnce({
+			id: 1,
+			email,
+			name: "Test User",
+			password_hash: hashedPassword,
+		});
 
 		const loginRes = await request(app)
 			.post("/api/login")

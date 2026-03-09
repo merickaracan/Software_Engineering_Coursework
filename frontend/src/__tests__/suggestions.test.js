@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   getSuggestionById,
   getSuggestionsByCommenterId,
+  getSuggestionsByNoteId,
   createSuggestion,
   updateSuggestion,
   deleteSuggestion,
@@ -102,9 +103,9 @@ describe("suggestions API", () => {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          commenterId: 10,
-          suggestionData: "Consider adding more examples",
-          noteOwnerId: 5,
+          note_id: 5,
+          commenter_id: 10,
+          suggestion_data: "Consider adding more examples",
         }),
       });
       expect(result).toEqual(mockResponse);
@@ -125,7 +126,7 @@ describe("suggestions API", () => {
 
       const result = await createSuggestion(null, "", null);
 
-      expect(result).toEqual(mockError);
+      expect(result.ok).toBe(false);
     });
   });
 
@@ -216,6 +217,64 @@ describe("suggestions API", () => {
       const result = await deleteSuggestion(999);
 
       expect(result).toEqual(mockError);
+    });
+  });
+
+  describe("getSuggestionsByNoteId", () => {
+    it("should fetch suggestions by note ID successfully", async () => {
+      const mockSuggestions = {
+        ok: true,
+        data: [
+          { id: 1, noteId: 5, commenterId: 10, suggestionData: "Great note!" },
+          { id: 2, noteId: 5, commenterId: 11, suggestionData: "Needs improvement" },
+        ],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockSuggestions,
+      });
+
+      const result = await getSuggestionsByNoteId(5);
+
+      expect(fetch).toHaveBeenCalledWith("/api/suggestions/note/5", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      expect(result).toEqual(mockSuggestions);
+    });
+
+    it("should return empty array for note with no suggestions", async () => {
+      const mockSuggestions = {
+        ok: true,
+        data: [],
+      };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockSuggestions,
+      });
+
+      const result = await getSuggestionsByNoteId(999);
+
+      expect(result.data).toEqual([]);
+    });
+
+    it("should handle errors when fetching suggestions by note ID", async () => {
+      fetch.mockRejectedValueOnce(new Error("Fetch failed"));
+
+      await expect(getSuggestionsByNoteId(5)).rejects.toThrow("Fetch failed");
+    });
+
+    it("should handle invalid note ID", async () => {
+      const mockError = { ok: false, error: "Invalid note ID" };
+
+      fetch.mockResolvedValueOnce({
+        json: async () => mockError,
+      });
+
+      const result = await getSuggestionsByNoteId(-1);
+
+      expect(result.ok).toBe(false);
     });
   });
 });

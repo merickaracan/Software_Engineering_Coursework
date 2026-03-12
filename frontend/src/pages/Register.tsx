@@ -10,6 +10,7 @@ import {
   Input,
   Button,
   Space,
+  Checkbox,
   message,
 } from "antd";
 import {
@@ -63,6 +64,7 @@ interface RegisterFormValues {
   email: string;
   password: string;
   confirmPassword: string;
+  lecturer?: boolean;
 }
 
 const Register: React.FC = () => {
@@ -73,14 +75,14 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: RegisterFormValues) => {
-    const { name, email, password } = values;
+    const { name, email, password, lecturer } = values;
     setLoading(true);
 
     try {
       const request = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, lecturer }),
       });
 
       const data = await request.json();
@@ -97,6 +99,7 @@ const Register: React.FC = () => {
       setTimeout(() => {
         navigate("/login");
       }, 2000);
+      setLoading(false);
     } catch {
       message.error("A network error occurred. Please try again.");
       setLoading(false);
@@ -146,7 +149,7 @@ const Register: React.FC = () => {
               {/* Left panel – info / branding */}
               <Col xs={0} md={12}>
                 <Card
-                  bordered={false}
+                  variant="borderless"
                   style={{
                     height: "100%",
                     background:
@@ -177,7 +180,7 @@ const Register: React.FC = () => {
               {/* Right panel – registration form */}
               <Col xs={24} md={12}>
                 <Card
-                  bordered={false}
+                  variant="borderless"
                   style={{
                     borderRadius: 16,
                     boxShadow: "0 18px 40px rgba(15, 35, 95, 0.18)",
@@ -186,7 +189,7 @@ const Register: React.FC = () => {
                   styles={{ body: { padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" } }}
                 >
                   <Space
-                    direction="vertical"
+                    orientation="vertical"
                     size="small"
                     style={{ width: "100%", marginBottom: 24 }}
                   >
@@ -272,6 +275,12 @@ const Register: React.FC = () => {
                           onVisibleChange: setPasswordVisible,
                         }}
                       />
+                    </Form.Item>
+
+                    <Form.Item name="lecturer" valuePropName="checked" style={{ marginBottom: 16 }}>
+                      <Checkbox>
+                        I am a lecturer
+                      </Checkbox>
                     </Form.Item>
 
                     <Form.Item style={{ marginBottom: 8 }}>

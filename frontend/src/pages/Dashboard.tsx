@@ -8,12 +8,14 @@ import {
   Card,
   Empty,
   Tag,
+  Spin,
 } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
 import Leaderboard from "../components/Leaderboard";
 import Modules from "../components/Modules";
 import SideMenu from "../components/SideMenu";
 import { useTheme } from "../components/ThemeContext";
+import { getNotesByEmail } from "../api/notes";
 
 const { Title, Text } = Typography;
 const { Header, Content } = Layout;
@@ -31,6 +33,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Clear stale localStorage notes from the old local-only implementation

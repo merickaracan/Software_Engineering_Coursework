@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+const requireAuth = require("../middleware/requireAuth");
+const { getUserByEmail, getUserPublic, updateUserProfile, deleteUser } = require("../services/userService");
+const db = require("../database/db");
 
 router.get("/users/id/:id", async (req, res) => {
     try{
-        const [rows] = await db.query("SELECT * FROM user_data WHERE id = ?",[req.params.id]);
+        const [rows] = await db.query("SELECT rowid AS id, email, name, lecturer, points, profile_picture FROM user_data WHERE rowid = ?", [req.params.id]);
         res.status(200).json({ ok: true, data: rows });
     }
     catch (err) {
@@ -22,33 +24,14 @@ router.get("/users/:email", async (req, res) => {
     }
 });
 
-router.put("/users/:email/profile-picture", async (req, res) => {
-    try {
-        const { profile_picture } = req.body;
-        const [result] = await db.query(
-            "UPDATE user_data SET profile_picture = ? WHERE email = ?",
-            [profile_picture || null, req.params.email]
-        );
-
-        if (result.affectedRows == 0) {
-            return res.status(404).json({ ok: false, error: "User not found" });
-        }
-
-        return res.status(200).json({ ok: true, message: "Profile picture updated" });
-    }
-    catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
 router.post("/users",async (req,res) =>{
     try{
-        const {email, name, password_hash,is_lecturer,points,profile_picture} = req.body;
-        const [result] = await db.query("INSERT INTO user_data (email, name, password_hash,is_lecturer,points,profile_picture) VALUES (?, ?, ?, ?, ?, ?)",[email, name, password_hash,is_lecturer,points,profile_picture || null]);
+        const {email, name, passkey, lecturer, points, profile_picture} = req.body;
+        const [result] = await db.query("INSERT INTO user_data (email, name, passkey, lecturer, points, profile_picture) VALUES (?, ?, ?, ?, ?, ?)",[email, name, passkey, lecturer, points, profile_picture || null]);
         return res.status(201).json({
             ok: true,
             message: "User created",
-            insertId: result.insertId
+            insertId: result.insertId || null
         });
     }
     catch (err){
@@ -56,31 +39,96 @@ router.post("/users",async (req,res) =>{
     }
 });
 
-router.delete("/users/:email", async (req,res) =>{
-    try{
-        const [result] = await db.query("DELETE FROM user_data WHERE email = ?",[req.params.email]);
-        if (result.affectedRows == 0){
-            return res.status(404).json({ ok: false, error: "User not found" });
+/**
+ * PUT /users/:email/profile-picture
+ * Updates a user's profile picture (requires authentication and ownership)
+ * @param {string} email - User email
+ * @param {Object} body - { profile_picture: string }
+ * @returns {Object} { ok: boolean, message: string }
+ */
+router.put("/users/:email/profile-picture", requireAuth, async (req, res) => {
+    try {
+        // Verify requesting user owns this profile
+        if (req.user.email !== req.params.email) {
+            return res.status(403).json({ ok: false, message: "Unauthorized - can only update own profile" });
         }
-        return res.status(200).json({ ok: true, message: "User deleted" });
 
-    }
-    catch (err){
-        res.status(500).json({ ok: false, error: err.message });
+        const { profile_picture } = req.body;
+        const result = await updateUserProfile(req.params.email, { profile_picture });
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ ok: false, message: "User not found" });
+        }
+
+        res.status(200).json({ ok: true, message: "Profile picture updated successfully" });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
     }
 });
 
-router.put("/users/:email", async (req,res) =>{
-    try{
-        const {name, password_hash,is_lecturer,points} = req.body;
-        const [result] = await db.query("UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",[name, password_hash,is_lecturer,points,req.params.email]);
-        if (result.affectedRows == 0){
-            return res.status(404).json({ ok: false, error: "User not found" });
+/**
+ * PUT /users/:email
+ * Updates user information (requires authentication and ownership)
+ * Only allows updating name and profile_picture
+ * @param {string} email - User email
+ * @param {Object} body - { name?: string, profile_picture?: string }
+ * @returns {Object} { ok: boolean, message: string }
+ */
+router.put("/users/:email", requireAuth, async (req, res) => {
+    try {
+        // Verify requesting user owns this profile
+        if (req.user.email !== req.params.email) {
+            return res.status(403).json({ ok: false, message: "Unauthorized - can only update own profile" });
         }
-        return res.status(200).json({ ok: true, message: "User updated" });
+
+        const { name, profile_picture } = req.body;
+        const updates = {};
+
+        if (name !== undefined) {
+            if (!name || name.length < 2) {
+                return res.status(400).json({ ok: false, message: "Name must be at least 2 characters" });
+            }
+            updates.name = name;
+        }
+
+        if (profile_picture !== undefined) {
+            updates.profile_picture = profile_picture;
+        }
+
+        const result = await updateUserProfile(req.params.email, updates);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ ok: false, message: "User not found" });
+        }
+
+        res.status(200).json({ ok: true, message: "User updated successfully" });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
     }
-    catch (err){
-        res.status(500).json({ ok: false, error: err.message });
+});
+
+/**
+ * DELETE /users/:email
+ * Deletes a user account (requires authentication and ownership)
+ * @param {string} email - User email
+ * @returns {Object} { ok: boolean, message: string }
+ */
+router.delete("/users/:email", requireAuth, async (req, res) => {
+    try {
+        // Verify requesting user owns this account
+        if (req.user.email !== req.params.email) {
+            return res.status(403).json({ ok: false, message: "Unauthorized - can only delete own account" });
+        }
+
+        const result = await deleteUser(req.params.email);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ ok: false, message: "User not found" });
+        }
+
+        res.status(200).json({ ok: true, message: "User account deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ ok: false, message: err.message });
     }
 });
 

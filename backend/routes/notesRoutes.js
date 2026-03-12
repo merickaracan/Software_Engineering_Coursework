@@ -1,6 +1,20 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+const db = require("../database/db");
+const requireAuth = require("../middleware/requireAuth");
+
+const isLecturerRequester = async (req) => {
+    if (req.user?.role === "teacher" || req.user?.email === "admin") {
+        return true;
+    }
+
+    if (!req.user?.email) {
+        return false;
+    }
+
+    const [rows] = await db.query("SELECT lecturer FROM user_data WHERE email = ?", [req.user.email]);
+    return Number(rows?.[0]?.lecturer ?? 0) === 1;
+};
 
 // Leaderboard — must come before /notes/:id
 router.get("/notes/leaderboard", async (req, res) => {
@@ -51,6 +65,37 @@ router.get("/notes/email/:email", async (req, res) => {
     }
 });
 
+// Search notes by title and/or author email
+router.get("/search", async (req, res) => {
+    try {
+        const title = typeof req.query.title === "string" ? req.query.title.trim() : "";
+        const author = typeof req.query.author === "string" ? req.query.author.trim() : "";
+
+        const [rows] = await db.query(
+            `
+            SELECT
+                id,
+                email AS owner_email,
+                note_title AS title,
+                note_data,
+                module,
+                verified AS is_verified,
+                NULL AS created_at,
+                NULL AS updated_at
+            FROM notes
+            WHERE note_title LIKE ?
+              AND email LIKE ?
+            ORDER BY id DESC
+            `,
+            [`%${title}%`, `%${author}%`]
+        );
+
+        res.status(200).json({ ok: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // Check if a specific user has rated a note
 router.get("/notes/:id/rating/:email", async (req, res) => {
     try {
@@ -65,7 +110,7 @@ router.get("/notes/:id/rating/:email", async (req, res) => {
 });
 
 // Submit a rating (one per user per note)
-router.post("/notes/:id/rate", async (req, res) => {
+router.post("/notes/:id/rate", requireAuth, async (req, res) => {
     try {
         const { rater_email, rating } = req.body;
         const note_id = req.params.id;
@@ -104,14 +149,24 @@ router.post("/notes/:id/rate", async (req, res) => {
 
 router.get("/notes/:id", async (req, res) => {
     try {
-        const [rows] = await db.query("SELECT * FROM notes WHERE id = ?", [req.params.id]);
+        const [rows] = await db.query(
+            `
+            SELECT
+                notes.*,
+                user_data.profile_picture AS owner_profile_picture
+            FROM notes
+            LEFT JOIN user_data ON user_data.email = notes.email
+            WHERE notes.id = ?
+            `,
+            [req.params.id]
+        );
         res.status(200).json({ ok: true, data: rows });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-router.post("/notes", async (req, res) => {
+router.post("/notes", requireAuth, async (req, res) => {
     try {
         const { email, verified, note_data, rating_average, number_ratings, module, note_title } = req.body;
         const [result] = await db.query(
@@ -124,7 +179,7 @@ router.post("/notes", async (req, res) => {
     }
 });
 
-router.delete("/notes/:id", async (req, res) => {
+router.delete("/notes/:id", requireAuth, async (req, res) => {
     try {
         const [result] = await db.query("DELETE FROM notes WHERE id = ?", [req.params.id]);
         if (result.affectedRows === 0) {
@@ -136,7 +191,7 @@ router.delete("/notes/:id", async (req, res) => {
     }
 });
 
-router.put("/notes/:id", async (req, res) => {
+router.put("/notes/:id", requireAuth, async (req, res) => {
     try {
         const { email, verified, note_data, rating_average, number_ratings, module, note_title } = req.body;
         const [result] = await db.query(
@@ -152,8 +207,13 @@ router.put("/notes/:id", async (req, res) => {
     }
 });
 
-router.put("/notes/verify/:id", async (req, res) => {
+router.put("/notes/verify/:id", requireAuth, async (req, res) => {
     try {
+        const isLecturer = await isLecturerRequester(req);
+        if (!isLecturer) {
+            return res.status(403).json({ ok: false, error: "Lecturer access required" });
+        }
+
         const [result] = await db.query("UPDATE notes SET verified=1 WHERE id=?", [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ ok: false, error: "Note not found" });
         return res.status(200).json({ ok: true, message: "Note verified" });
@@ -162,8 +222,13 @@ router.put("/notes/verify/:id", async (req, res) => {
     }
 });
 
-router.put("/notes/unverify/:id", async (req, res) => {
+router.put("/notes/unverify/:id", requireAuth, async (req, res) => {
     try {
+        const isLecturer = await isLecturerRequester(req);
+        if (!isLecturer) {
+            return res.status(403).json({ ok: false, error: "Lecturer access required" });
+        }
+
         const [result] = await db.query("UPDATE notes SET verified=0 WHERE id=?", [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ ok: false, error: "Note not found" });
         return res.status(200).json({ ok: true, message: "Note unverified" });

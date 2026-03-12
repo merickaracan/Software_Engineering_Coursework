@@ -1,7 +1,8 @@
-const db = require("../db");
+const db = require("../database/db");
 
 /**
- * Retrieves a user from the database by email
+ * Retrieves a user from the database by email (includes password hash)
+ * Internal use only - for authentication
  * @param {string} email - User's email address
  * @returns {Promise<Object|null>} User record matching the email or null if not found
  * @throws {Error} If the database query fails
@@ -9,6 +10,42 @@ const db = require("../db");
 const getUser = async (email) => {
     try {
         const [rows] = await db.query("SELECT * FROM user_data WHERE email = ?", [email]);
+        return rows.length > 0 ? rows[0] : null;
+    } catch (err) {
+        throw new Error(`Error fetching user: ${err.message}`);
+    }
+};
+
+/**
+ * Retrieves a user's public profile (excludes password hash)
+ * @param {string} email - User's email address
+ * @returns {Promise<Object|null>} User record without password_hash or null if not found
+ * @throws {Error} If the database query fails
+ */
+const getUserPublic = async (email) => {
+    try {
+        const [rows] = await db.query(
+            "SELECT email, name, lecturer, points FROM user_data WHERE email = ?",
+            [email]
+        );
+        return rows.length > 0 ? rows[0] : null;
+    } catch (err) {
+        throw new Error(`Error fetching user: ${err.message}`);
+    }
+};
+
+/**
+ * Retrieves a user by ID (excludes password hash)
+ * @param {number} id - User's ID
+ * @returns {Promise<Object|null>} User record without password_hash or null if not found
+ * @throws {Error} If the database query fails
+ */
+const getUserByEmail = async (email) => {
+    try {
+        const [rows] = await db.query(
+            "SELECT email, name, lecturer, points, profile_picture FROM user_data WHERE email = ?",
+            [email]
+        );
         return rows.length > 0 ? rows[0] : null;
     } catch (err) {
         throw new Error(`Error fetching user: ${err.message}`);
@@ -58,6 +95,43 @@ const updateUser = async (email, passkey = null, lecturer = null, points = null)
 };
 
 /**
+ * Updates user profile information (non-sensitive fields)
+ * @param {string} email - User's email address
+ * @param {Object} updates - Fields to update
+ * @param {string} [updates.name] - User's full name
+ * @param {string} [updates.profile_picture] - User's profile picture (base64)
+ * @returns {Promise<Object>} Update result with affectedRows
+ * @throws {Error} If the database query fails
+ */
+const updateUserProfile = async (email, updates = {}) => {
+    try {
+        const { name, profile_picture } = updates;
+        const fields = [];
+        const values = [];
+        
+        if (name !== undefined) {
+            fields.push("name = ?");
+            values.push(name);
+        }
+        if (profile_picture !== undefined) {
+            fields.push("profile_picture = ?");
+            values.push(profile_picture || null);
+        }
+        
+        if (fields.length === 0) {
+            return { affectedRows: 0 };
+        }
+        
+        values.push(email);
+        const query = `UPDATE user_data SET ${fields.join(", ")} WHERE email = ?`;
+        const [result] = await db.query(query, values);
+        return result;
+    } catch (err) {
+        throw new Error(`Error updating user profile: ${err.message}`);
+    }
+};
+
+/**
  * Deletes a user from the database
  * @param {string} email - User's email address
  * @returns {Promise<Object>} Delete result with affectedRows
@@ -74,7 +148,10 @@ const deleteUser = async (email) => {
 
 module.exports = {
     getUser,
+    getUserPublic,
+    getUserByEmail,
     createUser,
     updateUser,
+    updateUserProfile,
     deleteUser
 };

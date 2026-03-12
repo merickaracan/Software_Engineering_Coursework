@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Layout, Menu, Button, Typography } from "antd";
+import { Layout, Menu, Button, Typography, message } from "antd";
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -13,29 +13,51 @@ import {
   FileTextOutlined,
   BookOutlined,
   LogoutOutlined,
+  SearchOutlined,
   HomeOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "./ThemeContext";
+import { logout } from "../api/auth";
 
 const { Sider } = Layout;
 const { Text } = Typography;
 
 const SideMenu: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
-
+  
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
   const isTeacher = currentUser?.role === "teacher";
   const dashboardPath = isTeacher ? "/teacher-dashboard" : "/dashboard";
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await logout();
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      // Still clear local storage even if logout fails
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
 
   const currentKey = (() => {
     const path = location.pathname;
     if (path === "/dashboard" || path === "/teacher-dashboard") return "dashboard";
     if (path === "/leaderboard") return "leaderboard";
     if (path === "/my-notes") return "my-notes";
+    if (path === "/search-notes") return "search-notes";
     if (path === "/modules") return "modules";
     if (path === "/profile") return "profile";
     return "dashboard";
@@ -64,6 +86,12 @@ const SideMenu: React.FC = () => {
           },
         ]
       : []),
+    {
+      key: "search-notes",
+      icon: <SearchOutlined />,
+      label: "Search Notes",
+      onClick: () => navigate("/search-notes"),
+    },
     {
       key: "modules",
       icon: <BookOutlined />,
@@ -199,10 +227,8 @@ const SideMenu: React.FC = () => {
           icon={<LogoutOutlined />}
           block
           danger
-          onClick={() => {
-            localStorage.removeItem("user");
-            navigate("/login");
-          }}
+          loading={logoutLoading}
+          onClick={handleLogout}
           style={{
             textAlign: "left",
             display: "flex",

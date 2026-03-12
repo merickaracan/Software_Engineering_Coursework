@@ -34,8 +34,8 @@ const MyNotesPage: React.FC = () => {
     }
 
     fetch(`/api/notes/email/${encodeURIComponent(user.email)}`, {
-        credentials: "include",
-      })
+      credentials: "include",
+    })
       .then((res) => res.json())
       .then((data: { data?: Note[] }) => setNotes(data?.data ?? []))
       .catch(() => setNotes([]))

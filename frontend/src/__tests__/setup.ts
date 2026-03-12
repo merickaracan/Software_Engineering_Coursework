@@ -1,8 +1,11 @@
-import { vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
 
 if (!window.matchMedia) {
-  window.matchMedia = (query: string) =>
-    ({
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
       matches: false,
       media: query,
       onchange: null,
@@ -11,5 +14,23 @@ if (!window.matchMedia) {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
-    } as MediaQueryList);
+    })),
+  });
 }
+
+if (!globalThis.ResizeObserver) {
+  class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    writable: true,
+    value: ResizeObserver,
+  });
+}
+
+afterEach(() => {
+  cleanup();
+});

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Layout, Menu, Button, Typography, message } from "antd";
+import { Layout, Menu, Button, Typography } from "antd";
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -13,45 +13,29 @@ import {
   FileTextOutlined,
   BookOutlined,
   LogoutOutlined,
-  SearchOutlined,
+  HomeOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "./ThemeContext";
-import { logout } from "../api/auth";
 
 const { Sider } = Layout;
 const { Text } = Typography;
 
 const SideMenu: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true);
-  const [logoutLoading, setLogoutLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
 
-  const handleLogout = async () => {
-    setLogoutLoading(true);
-    try {
-      await logout();
-      localStorage.removeItem("user");
-      message.success("Logged out successfully");
-      navigate("/login");
-    } catch (error) {
-      console.error("Error logging out:", error);
-      // Still clear local storage even if logout fails
-      localStorage.removeItem("user");
-      message.success("Logged out successfully");
-      navigate("/login");
-    } finally {
-      setLogoutLoading(false);
-    }
-  };
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) : null;
+  const isTeacher = currentUser?.role === "teacher";
+  const dashboardPath = isTeacher ? "/teacher-dashboard" : "/dashboard";
 
   const currentKey = (() => {
     const path = location.pathname;
-    if (path === "/dashboard") return "dashboard";
+    if (path === "/dashboard" || path === "/teacher-dashboard") return "dashboard";
     if (path === "/leaderboard") return "leaderboard";
     if (path === "/my-notes") return "my-notes";
-    if (path === "/search-notes") return "search-notes";
     if (path === "/modules") return "modules";
     if (path === "/profile") return "profile";
     return "dashboard";
@@ -62,7 +46,7 @@ const SideMenu: React.FC = () => {
       key: "dashboard",
       icon: <DashboardOutlined />,
       label: "Dashboard",
-      onClick: () => navigate("/dashboard"),
+      onClick: () => navigate(dashboardPath),
     },
     {
       key: "leaderboard",
@@ -70,18 +54,16 @@ const SideMenu: React.FC = () => {
       label: "Leaderboard",
       onClick: () => navigate("/leaderboard"),
     },
-    {
-      key: "my-notes",
-      icon: <FileTextOutlined />,
-      label: "My Notes",
-      onClick: () => navigate("/my-notes"),
-    },
-    {
-      key: "search-notes",
-      icon: <SearchOutlined />,
-      label: "Search Notes",
-      onClick: () => navigate("/search-notes"),
-    },
+    ...(!isTeacher
+      ? [
+          {
+            key: "my-notes",
+            icon: <FileTextOutlined />,
+            label: "My Notes",
+            onClick: () => navigate("/my-notes"),
+          },
+        ]
+      : []),
     {
       key: "modules",
       icon: <BookOutlined />,
@@ -140,23 +122,25 @@ const SideMenu: React.FC = () => {
         />
       </div>
 
-      {/* Create Note button */}
-      <div style={{ padding: collapsed ? "12px 8px" : "12px 16px" }}>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          block
-          size={collapsed ? "middle" : "large"}
-          style={{
-            backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
-            borderColor: isDark ? "#4da3ff" : "#0b5ed7",
-            borderRadius: 8,
-          }}
-          onClick={() => navigate("/create-note")}
-        >
-          {!collapsed && "Create Note"}
-        </Button>
-      </div>
+      {/* Create Note button — hidden for teacher */}
+      {!isTeacher && (
+        <div style={{ padding: collapsed ? "12px 8px" : "12px 16px" }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            block
+            size={collapsed ? "middle" : "large"}
+            style={{
+              backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
+              borderColor: isDark ? "#4da3ff" : "#0b5ed7",
+              borderRadius: 8,
+            }}
+            onClick={() => navigate("/create-note")}
+          >
+            {!collapsed && "Create Note"}
+          </Button>
+        </div>
+      )}
 
       {/* Navigation */}
       <Menu
@@ -182,6 +166,21 @@ const SideMenu: React.FC = () => {
       >
         <Button
           type="text"
+          icon={<HomeOutlined />}
+          block
+          onClick={() => navigate("/")}
+          style={{
+            textAlign: "left",
+            color: isDark ? "#fff" : "#333",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+          }}
+        >
+          {!collapsed && "Home"}
+        </Button>
+        <Button
+          type="text"
           icon={isDark ? <SunOutlined /> : <MoonOutlined />}
           block
           onClick={toggleTheme}
@@ -200,8 +199,10 @@ const SideMenu: React.FC = () => {
           icon={<LogoutOutlined />}
           block
           danger
-          loading={logoutLoading}
-          onClick={handleLogout}
+          onClick={() => {
+            localStorage.removeItem("user");
+            navigate("/login");
+          }}
           style={{
             textAlign: "left",
             display: "flex",

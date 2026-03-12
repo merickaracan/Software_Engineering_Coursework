@@ -16,12 +16,11 @@ import type { Rule } from "antd/es/form";
 import {
   UserOutlined,
   LockOutlined,
-  LoginOutlined,  
+  LoginOutlined,
   SunOutlined,
   MoonOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "../components/ThemeContext";
-import { getUserByEmail } from "../api/auth";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -29,15 +28,19 @@ const { Content } = Layout;
 const LoginRules: Record<string, Rule[]> = {
   email: [
       { required: true, message: "Please enter your email." },
-      { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
-      { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
+      {
+        validator: (_, value) => {
+          if (!value) return Promise.resolve();
+          if (value === "admin") return Promise.resolve();
+          if (/^[a-zA-Z0-9.]+@bath\.ac\.uk$/.test(value)) return Promise.resolve();
+          return Promise.reject("Please enter a valid Bath email (e.g., user@bath.ac.uk).");
+        },
+      },
   ],
   
   password: [
     { required: true, message: "Please enter your password." },
-
   ],
-  
 };
 
 interface LoginFormValues {
@@ -45,9 +48,11 @@ interface LoginFormValues {
   password: string;
 }
 
+interface LoginProps {
+  setIsAuthenticated: (value: boolean) => void;
+}
 
-
-const Login = ({ setIsAuthenticated }) => {
+const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
@@ -55,60 +60,39 @@ const Login = ({ setIsAuthenticated }) => {
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
 
-    const request = await fetch("/api/login", {
-      method: "POST",
-      headers: {"Content-Type": "application/json",},
-      credentials: "include",
-      body: JSON.stringify(values)
-    })
-
-    const data = await request.json();
-
-    if (!data.ok) {
-      message.error(data.message || "Login failed. Please try again.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      // Fetch user details to get the name and ID
-      const userResponse = await getUserByEmail(values.email);
-      const userName = userResponse.ok && userResponse.data && userResponse.data.length > 0 
-        ? userResponse.data[0].name 
-        : values.email;
-      const userId = userResponse.ok && userResponse.data && userResponse.data.length > 0 
-        ? userResponse.data[0].id 
-        : null;
+      const request = await fetch("/api/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json",},
+        credentials: "include",
+        body: JSON.stringify({ email: values.email, password: values.password }),
+      });
 
-      // Set authentication state if callback provided
+      const data = await request.json();
+
+      if (!data.ok) {
+        message.error(data.message || "Login failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
       if (setIsAuthenticated) {
         setIsAuthenticated(true);
       }
 
-      localStorage.setItem("user", JSON.stringify({
-        email: values.email,
-        name: userName,
-        id: userId,
-      }));
-
       message.success("Logged in successfully");
       setLoading(false);
+      const isTeacher = data.user?.role === "teacher";
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate(isTeacher ? "/teacher-dashboard" : "/dashboard");
       }, 1000);
-    } catch (error) {
-      console.error("Error fetching user details:", error);
-      // Still log in even if we can't fetch user details
-      localStorage.setItem("user", JSON.stringify({
-        email: values.email,
-        name: values.email,
-        id: null,
-      }));
-      message.success("Logged in successfully");
+    } catch {
+      message.error("A network error occurred. Please try again.");
       setLoading(false);
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1000);
     }
   };
 

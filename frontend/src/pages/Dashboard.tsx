@@ -8,73 +8,47 @@ import {
   Card,
   Empty,
   Tag,
-  Spin,
 } from "antd";
 import { FileTextOutlined } from "@ant-design/icons";
 import Leaderboard from "../components/Leaderboard";
 import Modules from "../components/Modules";
 import SideMenu from "../components/SideMenu";
 import { useTheme } from "../components/ThemeContext";
-import { getNotesByEmail } from "../api/notes";
 
 const { Title, Text } = Typography;
 const { Header, Content } = Layout;
 
 interface Note {
-  id: string;
-  owner_id: number;
-  owner_email: string;
-  title: string;
+  id: number;
+  email: string;
+  note_title: string;
   note_data: string;
   module: string;
-  is_verified: number;
-  created_at: string;
-  updated_at: string;
+  verified: number;
 }
-
-const MODULE_LABELS: Record<string, string> = {
-  se: "Software Engineering",
-  ml: "Machine Learning",
-  sa: "Systems Architecture",
-  vc: "Visual Computing",
-  db: "Databases",
-  ai: "Artificial Intelligence",
-};
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchNotes = async () => {
-      try {
-        const storedUser = localStorage.getItem("user");
-        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+    // Clear stale localStorage notes from the old local-only implementation
+    localStorage.removeItem("myNotes");
 
-        if (!currentUser || !currentUser.email) {
-          setRecentNotes([]);
-          setLoading(false);
-          return;
-        }
+    const stored = localStorage.getItem("user");
+    const user = stored ? JSON.parse(stored) : null;
+    if (!user?.email) return;
 
-        const response = await getNotesByEmail(currentUser.email);
-        
-        if (response.ok && response.data) {
-          // Get the last 3 notes in reverse order
-          const notes = Array.isArray(response.data) ? response.data : [];
-          setRecentNotes(notes.slice(-3).reverse());
-        }
-      } catch (error) {
-        console.error("Error fetching notes:", error);
-        setRecentNotes([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNotes();
+    fetch(`/api/notes/email/${encodeURIComponent(user.email)}`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data: { data?: Note[] }) => {
+        const notes = data?.data ?? [];
+        setRecentNotes(notes.slice(-3).reverse());
+      })
+      .catch(() => setRecentNotes([]));
   }, []);
 
   return (
@@ -104,7 +78,7 @@ const Dashboard: React.FC = () => {
         {/* Main content */}
         <Content style={{ padding: "32px" }}>
           {/* Leaderboard section */}
-          <Leaderboard onTitleClick={() => navigate("/leaderboard")} />
+          <Leaderboard onTitleClick={() => navigate("/leaderboard")} limit={5} />
 
           {/* My Notes section */}
           <section style={{ marginBottom: 48 }}>
@@ -118,43 +92,41 @@ const Dashboard: React.FC = () => {
                 My Notes
               </Title>
             </Row>
-            <Spin spinning={loading} tip="Loading notes...">
-              {recentNotes.length === 0 ? (
-                <Empty description="You have no notes yet." />
-              ) : (
-                <Row gutter={[16, 16]}>
-                  {recentNotes.map((note) => (
-                    <Col xs={24} sm={12} md={8} key={note.id}>
-                      <Card
-                        hoverable
-                        onClick={() => navigate(`/note/${note.id}`)}
-                        style={{
-                          borderRadius: 12,
-                          boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
-                          border: isDark ? "1px solid #303030" : undefined,
-                          background: isDark ? "#1f1f1f" : "#fff",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <Title level={5} style={{ marginBottom: 6 }}>
-                          {note.title}
-                        </Title>
-                        <Tag color="blue" style={{ borderRadius: 6, marginBottom: 8 }}>
-                          {MODULE_LABELS[note.module] ?? note.module}
-                        </Tag>
-                        <Text type="secondary" style={{ fontSize: 13, display: "block" }}>
-                          {note.note_data
-                            ? note.note_data.length > 80
-                              ? note.note_data.slice(0, 80) + "…"
-                              : note.note_data
-                            : "No description."}
-                        </Text>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              )}
-            </Spin>
+            {recentNotes.length === 0 ? (
+              <Empty description="You have no notes yet." />
+            ) : (
+              <Row gutter={[16, 16]}>
+                {recentNotes.map((note) => (
+                  <Col xs={24} sm={12} md={8} key={note.id}>
+                    <Card
+                      hoverable
+                      onClick={() => navigate(`/note/${note.id}`)}
+                      style={{
+                        borderRadius: 12,
+                        boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
+                        border: isDark ? "1px solid #303030" : undefined,
+                        background: isDark ? "#1f1f1f" : "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Title level={5} style={{ marginBottom: 6 }}>
+                        {note.note_title || "Untitled Note"}
+                      </Title>
+                      <Tag color="blue" style={{ borderRadius: 6, marginBottom: 8 }}>
+                        {note.module}
+                      </Tag>
+                      <Text type="secondary" style={{ fontSize: 13, display: "block" }}>
+                        {note.note_data
+                          ? note.note_data.length > 80
+                            ? note.note_data.slice(0, 80) + "…"
+                            : note.note_data
+                          : "No description."}
+                      </Text>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
           </section>
 
           {/* Modules section */}

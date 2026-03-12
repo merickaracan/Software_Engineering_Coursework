@@ -69,7 +69,7 @@ function validateRegistration(data) {
 
 // Register User
 router.post("/register", async (req, res) => {
-  const { name, email, password, is_lecturer } = req.body;
+  const { name, email, password } = req.body;
 
   // Validate input
   const validationErrors = validateRegistration({ name, email, password });
@@ -81,27 +81,33 @@ router.post("/register", async (req, res) => {
     });
   }
 
-  // Check if email already exists in database
-  const existingUser = await getUser(email);
-  if (existingUser) {
-    return res.status(409).json({
+  try {
+    // Check if email already exists in database
+    const existingUser = await getUser(email);
+    if (existingUser) {
+      return res.status(409).json({
+        ok: false,
+        errors: ["Email is already registered."],
+      });
+    }
+
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Add data to database
+    await createUser(email, hashedPassword, name);
+
+    res.json({
+      ok: true,
+      message: "Account created successfully",
+    });
+  } catch (err) {
+    console.error("Register error:", err.message);
+    res.status(500).json({
       ok: false,
-      errors: ["Email is already registered."],
+      errors: ["An internal error occurred. Please try again."],
     });
   }
-
-  // Hash password before storing
-  const hashedPassword = await bcrypt.hash(password, 12);
-
-  const lecturerFlag = is_lecturer ? 1 : 0;
-
-  // Add data to database
-  await createUser(email, name, hashedPassword, lecturerFlag);
-
-  res.json({
-    ok: true,
-    message: "Account created successfully",
-  });
 })
 
 router.post("/login", async (req, res) => {
@@ -114,39 +120,64 @@ router.post("/login", async (req, res) => {
     });
   }
 
-  const user = await getUser(email);
-
-  if (user === null) {
-    return res.status(401).json({
-      ok: false,
-      message: "Invalid email or password.",
+  // Hardcoded teacher login (no registration required)
+  if (email === "admin" && password === "12345678!") {
+    const token = jwt.sign({ email: "admin", role: "teacher" }, JWT_SECRET, { expiresIn: "24h" });
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+    return res.json({
+      ok: true,
+      message: "Login successful.",
+      user: { name: "Teacher", email: "admin", role: "teacher" },
     });
   }
 
-  const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+  try {
+    const user = await getUser(email);
 
-  if (!isPasswordValid) {
-    return res.status(401).json({
+    if (user === null) {
+      return res.status(401).json({
+        ok: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passkey);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        ok: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Create JWT token
+    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "24h" });
+
+    // Send as HTTP-only cookie
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      ok: true,
+      message: "Login successful.",
+      user: { name: user.name, email: user.email },
+    });
+  } catch (err) {
+    console.error("Login error:", err.message);
+    res.status(500).json({
       ok: false,
-      message: "Invalid email or password.",
+      message: "An internal error occurred. Please try again.",
     });
   }
-
-  // Create JWT token
-  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "24h" });
-
-  // Send as HTTP-only cookie
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "strict",
-    maxAge: 24 * 60 * 60 * 1000,
-  });
-
-  res.json({
-    ok: true,
-    message: "Login successful.",
-  });
 });
 
 // Logout User

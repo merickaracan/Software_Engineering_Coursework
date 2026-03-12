@@ -1,68 +1,29 @@
 const mysql = require("mysql2");
 const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
-const localDb = require("./localDb");
-
-// Ensure local database is ready before accepting queries
-localDb.waitForDbReady().catch((err) => {
-  console.error("Failed to initialize local database:", err.message);
-});
-
-// Create MySQL connection pool
-const cloudConnection = mysql.createPool({
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-
   ssl: {
-    ca: fs.readFileSync("./ca.pem") // Aiven CA cert
-  }
+    ca: fs.readFileSync(path.join(__dirname, "ca.pem")),
+  },
+  waitForConnections: true,
+  connectionLimit: 10,
 });
 
-const cloudDb = cloudConnection.promise();
-let isCloudConnected = false;
-if (cloudConnection && isCloudConnected) {
-  console.log("✅ Connected to cloud database");
-} else {
-  console.warn("⚠️  Using local SQLite fallback");
-}
+const db = pool.promise();
 
-/**
- * Database wrapper with automatic failover [for development only]
- * Tries cloud database first, falls back to local SQLite if connection fails
- */
-const dbProxy = {
-  async query(sql, params = []) {
-    if (isCloudConnected) {
-      try {
-        const result = await cloudDb.query(sql, params);
-        return result;
-      } catch (err) {
-        console.error("❌ Cloud database error:", err.message);
-        console.warn("⚠️  Switching to local database fallback...");
-        isCloudConnected = false;
-        
-        // Fallback to local database
-        try {
-          return await localDb.query(sql, params);
-        } catch (localErr) {
-          console.error("❌ Local database error:", localErr.message);
-          throw localErr;
-        }
-      }
-    } else {
-      // Already failed, use local database
-      try {
-        return await localDb.query(sql, params);
-      } catch (err) {
-        console.error("❌ Local database error:", err.message);
-        throw err;
-      }
-    }
-  }
-};
+// Verify connection on startup
+db.query("SELECT 1")
+  .then(() => console.log("✅ Connected to Aiven MySQL database"))
+  .catch((err) => {
+    console.error("❌ Failed to connect to Aiven database:", err.message);
+    process.exit(1);
+  });
 
-module.exports = dbProxy;
+module.exports = db;

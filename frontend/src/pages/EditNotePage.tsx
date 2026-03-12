@@ -8,26 +8,32 @@ import {
   Button,
   Select,
   Upload,
+  List,
+  Space,
   message,
+  Modal,
   Row,
   Col,
   Result,
   Empty,
+  Spin,
 } from "antd";
 import {
   SaveOutlined,
   ArrowLeftOutlined,
+  DeleteOutlined,
+  PaperClipOutlined,
   InboxOutlined,
 } from "@ant-design/icons";
 import type { UploadFile } from "antd";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
-import { getNoteById, updateNote } from "../api/notes";
+
+const { Dragger } = Upload;
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 const { TextArea } = Input;
-const { Dragger } = Upload;
 
 const MODULES = [
   { value: "se", label: "Software Engineering" },
@@ -39,15 +45,22 @@ const MODULES = [
 ];
 
 interface Note {
-  id: string;
-  title: string;
+  id: number;
+  email: string;
+  verified: number;
   note_data: string;
+  rating_average: number;
+  number_ratings: number;
   module: string;
-  owner_email: string;
-  file_name?: string;
-  file_type?: string;
-  file_size?: number;
-  file_data?: string;
+  note_title: string;
+}
+
+interface NoteFile {
+  id: number;
+  note_id: number;
+  filename: string;
+  stored_name: string;
+  uploaded_at: string;
 }
 
 const EditNotePage: React.FC = () => {
@@ -57,68 +70,66 @@ const EditNotePage: React.FC = () => {
 
   const [note, setNote] = useState<Note | null | undefined>(undefined);
   const [isOwner, setIsOwner] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [noteData, setNoteData] = useState("");
   const [module, setModule] = useState<string | undefined>(undefined);
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [existingFiles, setExistingFiles] = useState<NoteFile[]>([]);
+  const [newFiles, setNewFiles] = useState<UploadFile[]>([]);
+  const [deletingFileId, setDeletingFileId] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchNote = async () => {
-      if (!id) {
-        setNote(null);
-        return;
-      }
-
-      try {
-        const response = await getNoteById(id);
-        const found = response?.ok && Array.isArray(response.data) && response.data.length > 0
-          ? response.data[0]
-          : null;
-
+    if (!id) return;
+    Promise.all([
+      fetch(`/api/notes/${id}`, { credentials: "include" }).then((r) => r.json()),
+      fetch(`/api/notes/${id}/files`, { credentials: "include" }).then((r) => r.json()),
+    ])
+      .then(([noteRes, filesRes]) => {
+        const found: Note | null = noteRes?.data?.[0] ?? null;
         setNote(found);
-
-        if (!found) {
-          return;
-        }
-
-        const storedUser = localStorage.getItem("user");
-        const currentUser = storedUser ? JSON.parse(storedUser) : null;
-        const owns = currentUser?.email === found.owner_email;
-        setIsOwner(owns);
-
-        if (owns) {
-          setTitle(found.title || "");
-          setDescription(found.note_data || "");
-          setModule(found.module);
-
-          if (found.file_name) {
-            setFileList([
-              {
-                uid: "existing-file",
-                name: found.file_name,
-                status: "done",
-              },
-            ]);
-          } else {
-            setFileList([]);
+        setExistingFiles(filesRes?.data ?? []);
+        if (found) {
+          const storedUser = localStorage.getItem("user");
+          const currentUser = storedUser ? JSON.parse(storedUser) : null;
+          const owns = currentUser?.email === found.email;
+          setIsOwner(owns);
+          if (owns) {
+            setTitle(found.note_title ?? "");
+            setNoteData(found.note_data ?? "");
+            setModule(found.module);
           }
         }
-      } catch (error) {
-        console.error("Error fetching note for editing:", error);
-        setNote(null);
-      }
-    };
-
-    fetchNote();
+      })
+      .catch(() => setNote(null));
   }, [id]);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
+  const handleDeleteFile = (fileId: number) => {
+    Modal.confirm({
+      title: "Remove this attachment?",
+      content: "The file will be permanently deleted.",
+      okText: "Remove",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: async () => {
+        setDeletingFileId(fileId);
+        try {
+          const res = await fetch(`/api/files/${fileId}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+          if (res.ok) {
+            setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+            message.success("Attachment removed.");
+          } else {
+            message.error("Failed to remove attachment.");
+          }
+        } catch {
+          message.error("Failed to remove attachment.");
+        } finally {
+          setDeletingFileId(null);
+        }
+      },
     });
   };
 
@@ -131,49 +142,76 @@ const EditNotePage: React.FC = () => {
       message.error("Please select a module.");
       return;
     }
+    if (!note) return;
 
-    if (!id || !note) {
-      message.error("Note not found.");
-      return;
-    }
-
+    setSaving(true);
     try {
-      let filePayload = null;
-
-      if (fileList.length > 0) {
-        const selectedFile = fileList[0];
-
-        if (selectedFile.originFileObj) {
-          const base64 = await fileToBase64(selectedFile.originFileObj);
-          filePayload = {
-            name: selectedFile.name,
-            type: selectedFile.type || "application/octet-stream",
-            size: selectedFile.size || 0,
-            data: base64,
-          };
-        } else if (note.file_name && note.file_data) {
-          filePayload = {
-            name: note.file_name,
-            type: note.file_type || "application/octet-stream",
-            size: note.file_size || 0,
-            data: note.file_data,
-          };
-        }
-      }
-
-      const response = await updateNote(id, title.trim(), description.trim(), module, filePayload);
-
-      if (!response.ok) {
-        message.error(response.error || "Failed to update note.");
+      const res = await fetch(`/api/notes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email: note.email,
+          verified: note.verified,
+          note_data: noteData.trim(),
+          rating_average: note.rating_average,
+          number_ratings: note.number_ratings,
+          module,
+          note_title: title.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        message.error(data.error ?? "Failed to update note.");
         return;
       }
 
+      // Upload any newly added files
+      if (newFiles.length > 0) {
+        const formData = new FormData();
+        newFiles.forEach((f) => {
+          if (f.originFileObj) formData.append("files", f.originFileObj);
+        });
+        await fetch(`/api/notes/${id}/files`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+      }
+
       message.success("Note updated successfully!");
-      setTimeout(() => navigate(`/note/${id}`), 400);
-    } catch (error) {
-      console.error("Error updating note:", error);
-      message.error("Failed to update note. Please try again.");
+      setTimeout(() => navigate(`/note/${id}`, { replace: true }), 400);
+    } catch {
+      message.error("Failed to update note.");
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleDelete = () => {
+    Modal.confirm({
+      title: "Delete this note?",
+      content: "This action cannot be undone. The note will be permanently removed.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      onOk: async () => {
+        try {
+          const res = await fetch(`/api/notes/${id}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+          if (res.ok) {
+            message.success("Note deleted.");
+            navigate("/my-notes");
+          } else {
+            message.error("Failed to delete note.");
+          }
+        } catch {
+          message.error("Failed to delete note.");
+        }
+      },
+    });
   };
 
   const cardStyle: React.CSSProperties = {
@@ -185,7 +223,15 @@ const EditNotePage: React.FC = () => {
   };
 
   // Loading state
-  if (note === undefined) return null;
+  if (note === undefined) {
+    return (
+      <PageLayout>
+        <Content style={{ padding: "32px", textAlign: "center" }}>
+          <Spin size="large" />
+        </Content>
+      </PageLayout>
+    );
+  }
 
   // Note not found
   if (note === null) {
@@ -236,13 +282,6 @@ const EditNotePage: React.FC = () => {
         <Row justify="center">
           <Col xs={24} md={20} lg={16}>
             <Row align="middle" style={{ marginBottom: 24 }}>
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate(`/note/${id}`)}
-                style={{ marginRight: 16, borderRadius: 8 }}
-              >
-                Cancel
-              </Button>
               <Title level={2} style={{ margin: 0 }}>Edit Note</Title>
             </Row>
 
@@ -276,8 +315,8 @@ const EditNotePage: React.FC = () => {
                   <TextArea
                     placeholder="Add a description or summary of your note..."
                     rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    value={noteData}
+                    onChange={(e) => setNoteData(e.target.value)}
                     style={{ borderRadius: 8 }}
                   />
                 </div>
@@ -285,11 +324,40 @@ const EditNotePage: React.FC = () => {
             </Card>
 
             <Card style={cardStyle}>
-              <Text strong style={{ display: "block", marginBottom: 12 }}>Upload Files</Text>
+              <Text strong style={{ display: "block", marginBottom: 12 }}>Attachments</Text>
+
+              {existingFiles.length > 0 && (
+                <List
+                  dataSource={existingFiles}
+                  style={{ marginBottom: 16 }}
+                  renderItem={(file) => (
+                    <List.Item
+                      actions={[
+                        <Button
+                          key="delete"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          loading={deletingFileId === file.id}
+                          onClick={() => handleDeleteFile(file.id)}
+                        >
+                          Remove
+                        </Button>,
+                      ]}
+                    >
+                      <Space>
+                        <PaperClipOutlined style={{ color: isDark ? "#4da3ff" : "#0b5ed7" }} />
+                        <Text>{file.filename}</Text>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              )}
+
               <Dragger
-                maxCount={1}
-                fileList={fileList}
-                onChange={({ fileList: newFileList }) => setFileList(newFileList)}
+                multiple
+                fileList={newFiles}
+                onChange={({ fileList }) => setNewFiles(fileList)}
                 beforeUpload={() => false}
                 style={{
                   borderRadius: 12,
@@ -297,25 +365,24 @@ const EditNotePage: React.FC = () => {
                   border: isDark ? "1px dashed #303030" : undefined,
                 }}
               >
-                <p style={{ fontSize: 40, color: isDark ? "#4da3ff" : "#0b5ed7", marginBottom: 8 }}>
+                <p style={{ fontSize: 32, color: isDark ? "#4da3ff" : "#0b5ed7", marginBottom: 8 }}>
                   <InboxOutlined />
                 </p>
-                <p style={{ fontSize: 15, fontWeight: 500 }}>
-                  Click or drag files to upload
-                </p>
-                <p style={{ fontSize: 13, color: "#999" }}>
-                  Supports PDF, DOCX, images, and other file types
+                <p style={{ fontSize: 14, fontWeight: 500 }}>Click or drag files to add attachments</p>
+                <p style={{ fontSize: 12, color: "#999" }}>
+                  New files will be uploaded when you save
                 </p>
               </Dragger>
             </Card>
 
             <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12}>
+              <Col xs={24} sm={8}>
                 <Button
                   type="primary"
                   size="large"
                   icon={<SaveOutlined />}
                   block
+                  loading={saving}
                   onClick={handleSave}
                   style={{
                     backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
@@ -327,14 +394,26 @@ const EditNotePage: React.FC = () => {
                   Save Changes
                 </Button>
               </Col>
-              <Col xs={24} sm={12}>
+              <Col xs={24} sm={8}>
                 <Button
                   size="large"
                   block
-                  onClick={() => navigate(`/note/${id}`)}
+                  onClick={() => navigate(-1)}
                   style={{ borderRadius: 8, height: 48 }}
                 >
                   Cancel
+                </Button>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Button
+                  danger
+                  size="large"
+                  icon={<DeleteOutlined />}
+                  block
+                  onClick={handleDelete}
+                  style={{ borderRadius: 8, height: 48 }}
+                >
+                  Delete Note
                 </Button>
               </Col>
             </Row>

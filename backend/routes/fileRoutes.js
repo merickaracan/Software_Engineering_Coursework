@@ -4,7 +4,8 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-const db = require("../db");
+const requireAuth = require("../middleware/requireAuth");
+const db = require("../database/db");
 
 const UPLOADS_DIR = path.join(__dirname, "../uploads");
 
@@ -19,7 +20,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // Upload files for a note
-router.post("/notes/:id/files", upload.array("files"), async (req, res) => {
+router.post("/notes/:id/files", requireAuth, upload.array("files"), async (req, res) => {
     try {
         const noteId = req.params.id;
         const files = req.files;
@@ -30,8 +31,15 @@ router.post("/notes/:id/files", upload.array("files"), async (req, res) => {
 
         const inserts = files.map((f) =>
             db.query(
-                "INSERT INTO note_files (note_id, filename, stored_name) VALUES (?, ?, ?)",
-                [noteId, f.originalname, f.filename]
+                "INSERT INTO note_files (note_id, filename, stored_name, file_size, file_type, file_extension) VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    noteId,
+                    f.originalname,
+                    f.filename,
+                    f.size,
+                    f.mimetype || "application/octet-stream",
+                    path.extname(f.originalname) || "",
+                ]
             )
         );
         await Promise.all(inserts);
@@ -46,7 +54,7 @@ router.post("/notes/:id/files", upload.array("files"), async (req, res) => {
 router.get("/notes/:id/files", async (req, res) => {
     try {
         const [rows] = await db.query(
-            "SELECT id, note_id, filename, stored_name, uploaded_at FROM note_files WHERE note_id = ?",
+            "SELECT id, note_id, filename, stored_name, file_size, file_type, file_extension, uploaded_at FROM note_files WHERE note_id = ?",
             [req.params.id]
         );
         res.status(200).json({ ok: true, data: rows });
@@ -76,8 +84,33 @@ router.get("/files/:fileId", async (req, res) => {
     }
 });
 
+// View a file inline by its DB id (useful for PDF preview)
+router.get("/files/:fileId/view", async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            "SELECT filename, stored_name, file_type FROM note_files WHERE id = ?",
+            [req.params.fileId]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ ok: false, error: "File not found." });
+        }
+
+        const { filename, stored_name, file_type } = rows[0];
+        const filePath = path.join(UPLOADS_DIR, stored_name);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ ok: false, error: "File missing from storage." });
+        }
+
+        res.setHeader("Content-Type", file_type || "application/octet-stream");
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        return res.sendFile(filePath);
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // Delete a file by its DB id
-router.delete("/files/:fileId", async (req, res) => {
+router.delete("/files/:fileId", requireAuth, async (req, res) => {
     try {
         const [rows] = await db.query(
             "SELECT stored_name FROM note_files WHERE id = ?",

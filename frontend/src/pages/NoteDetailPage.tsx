@@ -25,6 +25,7 @@ import {
   DownloadOutlined,
   PaperClipOutlined,
   SafetyCertificateOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
@@ -40,6 +41,7 @@ interface RawNote {
   module?: string;
   owner_email?: string;
   email?: string;
+  owner_profile_picture?: string;
   is_verified?: number;
   verified?: number;
   rating_average?: number;
@@ -57,6 +59,7 @@ interface NoteView {
   content: string;
   module: string;
   ownerEmail: string;
+  ownerProfilePicture?: string;
   verified: number;
   ratingAverage: number;
   numberRatings: number;
@@ -76,7 +79,7 @@ interface CommentItem {
   commenter_name?: string;
   commenter_email?: string;
   commenter_profile_picture?: string;
-  is_lecturer?: number | boolean;
+  lecturer?: number | boolean;
 }
 
 interface NoteFile {
@@ -84,12 +87,16 @@ interface NoteFile {
   note_id: number;
   filename: string;
   stored_name: string;
+  file_type?: string;
+  file_size?: number;
   uploaded_at: string;
 }
 
 interface UserSession {
   id?: number;
   email?: string;
+  role?: string;
+  lecturer?: number | string;
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -107,6 +114,7 @@ const normalizeNote = (raw: RawNote): NoteView => ({
   content: raw.note_data ?? "",
   module: raw.module ?? "",
   ownerEmail: raw.owner_email ?? raw.email ?? "",
+  ownerProfilePicture: raw.owner_profile_picture,
   verified: Number(raw.is_verified ?? raw.verified ?? 0),
   ratingAverage: Number(raw.rating_average ?? 0),
   numberRatings: Number(raw.number_ratings ?? 0),
@@ -124,6 +132,30 @@ const formatFileSize = (bytes: number): string => {
   return `${Math.round((bytes / Math.pow(1024, index)) * 100) / 100} ${units[index]}`;
 };
 
+const isPdfFile = (fileType?: string, fileName?: string): boolean => {
+  const normalizedType = (fileType || "").toLowerCase();
+  const normalizedName = (fileName || "").toLowerCase();
+  return normalizedType.includes("application/pdf") || normalizedName.endsWith(".pdf");
+};
+
+const toDataUrlIfNeeded = (rawData?: string, mimeType = "application/pdf"): string | null => {
+  if (!rawData) return null;
+  const trimmed = rawData.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:")) return trimmed;
+  return `data:${mimeType};base64,${trimmed}`;
+};
+
+const toImageSrcIfNeeded = (rawImage?: string): string | undefined => {
+  if (!rawImage) return undefined;
+  const trimmed = rawImage.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("data:") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  return `data:image/jpeg;base64,${trimmed}`;
+};
+
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -134,6 +166,11 @@ const NoteDetailPage: React.FC = () => {
     return stored ? JSON.parse(stored) : {};
   }, []);
 
+  const hasLecturerHint =
+    currentUser.email === "admin" ||
+    currentUser.role === "teacher" ||
+    Number(currentUser.lecturer ?? 0) === 1;
+
   const [note, setNote] = useState<NoteView | null>(null);
   const [loading, setLoading] = useState(true);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -141,12 +178,18 @@ const NoteDetailPage: React.FC = () => {
   const [noteFiles, setNoteFiles] = useState<NoteFile[]>([]);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [isLecturer, setIsLecturer] = useState(false);
+  const [isLecturer, setIsLecturer] = useState(hasLecturerHint);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [userRating, setUserRating] = useState(0);
   const [hasRated, setHasRated] = useState(false);
+  const [selectedPdfPreview, setSelectedPdfPreview] = useState<{ url: string; name: string } | null>(null);
 
   const isOwner = Boolean(note && currentUser.email && note.ownerEmail === currentUser.email);
+
+  const inlinePdfPreviewUrl = useMemo(() => {
+    if (!note || !note.fileData || !isPdfFile(note.fileType, note.fileName)) return null;
+    return toDataUrlIfNeeded(note.fileData, note.fileType || "application/pdf");
+  }, [note]);
 
   useEffect(() => {
     const fetchCurrentUserRole = async () => {
@@ -155,20 +198,27 @@ const NoteDetailPage: React.FC = () => {
         return;
       }
 
+      if (hasLecturerHint) {
+        setIsLecturer(true);
+      }
+
       try {
         const response = await fetch(`/api/users/${encodeURIComponent(currentUser.email)}`, {
           credentials: "include",
         });
         const data = await response.json();
         const userData = data?.ok && Array.isArray(data.data) ? data.data[0] : null;
-        setIsLecturer(userData?.is_lecturer === 1);
+        const isAdminTeacher = currentUser.email === "admin";
+        const isLecturerAccount = Number(userData?.lecturer ?? 0) === 1;
+        setIsLecturer(isAdminTeacher || isLecturerAccount);
       } catch {
-        setIsLecturer(false);
+        // Keep current value so role-fetch failures don't hide lecturer controls.
+        setIsLecturer((prev) => prev);
       }
     };
 
     fetchCurrentUserRole();
-  }, [currentUser.email]);
+  }, [currentUser.email, hasLecturerHint]);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -202,6 +252,19 @@ const NoteDetailPage: React.FC = () => {
 
         setComments(Array.isArray(commentsData?.data) ? commentsData.data : []);
         setNoteFiles(Array.isArray(filesData?.data) ? filesData.data : []);
+
+        const firstPdfAttachment = (Array.isArray(filesData?.data) ? filesData.data : []).find((file: NoteFile) =>
+          isPdfFile(file.file_type, file.filename)
+        );
+
+        if (firstPdfAttachment) {
+          setSelectedPdfPreview({
+            url: `/api/files/${firstPdfAttachment.id}/view`,
+            name: firstPdfAttachment.filename,
+          });
+        } else {
+          setSelectedPdfPreview(null);
+        }
 
         if (currentUser.email) {
           const ratingRes = await fetch(
@@ -242,6 +305,13 @@ const NoteDetailPage: React.FC = () => {
     } finally {
       setCommentsLoading(false);
     }
+  };
+
+  const handlePreviewAttachmentPdf = (file: NoteFile) => {
+    setSelectedPdfPreview({
+      url: `/api/files/${file.id}/view`,
+      name: file.filename,
+    });
   };
 
   const handleVerifyToggle = async () => {
@@ -432,9 +502,16 @@ const NoteDetailPage: React.FC = () => {
               {MODULE_LABELS[note.module] ?? note.module}
             </Tag>
             {note.ownerEmail && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                By {note.ownerEmail}
-              </Text>
+              <Space size={8} align="center">
+                <Avatar
+                  size="small"
+                  src={toImageSrcIfNeeded(note.ownerProfilePicture)}
+                  icon={<UserOutlined />}
+                />
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  By {note.ownerEmail}
+                </Text>
+              </Space>
             )}
             {note.createdAt && (
               <Text type="secondary" style={{ fontSize: 13 }}>
@@ -443,7 +520,7 @@ const NoteDetailPage: React.FC = () => {
             )}
             {note.verified === 1 && (
               <Tag icon={<CheckCircleOutlined />} color="success">
-                Verified
+                Teacher Verified
               </Tag>
             )}
           </Space>
@@ -468,7 +545,7 @@ const NoteDetailPage: React.FC = () => {
             style={cardStyle}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <Space direction="vertical" size={0}>
+              <Space orientation="vertical" size={0}>
                 <Text strong>{note.fileName}</Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {note.fileSize ? formatFileSize(note.fileSize) : "Unknown size"}
@@ -480,9 +557,9 @@ const NoteDetailPage: React.FC = () => {
               </Button>
             </div>
 
-            {note.fileType === "application/pdf" && note.fileData && (
+            {inlinePdfPreviewUrl && (
               <div style={{ marginTop: 16, border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`, borderRadius: 6, overflow: "hidden" }}>
-                <iframe src={note.fileData} style={{ width: "100%", minHeight: "70vh", border: "none" }} title={note.fileName} />
+                <iframe src={inlinePdfPreviewUrl} style={{ width: "100%", minHeight: "70vh", border: "none" }} title={note.fileName} />
               </div>
             )}
           </Card>
@@ -503,10 +580,15 @@ const NoteDetailPage: React.FC = () => {
               renderItem={(file) => (
                 <List.Item
                   actions={[
+                    isPdfFile(file.file_type, file.filename) ? (
+                      <Button key="preview" type="link" icon={<EyeOutlined />} onClick={() => handlePreviewAttachmentPdf(file)}>
+                        Preview
+                      </Button>
+                    ) : null,
                     <Button key="download" type="link" icon={<DownloadOutlined />} href={`/api/files/${file.id}`} download={file.filename}>
                       Download
                     </Button>,
-                  ]}
+                  ].filter(Boolean)}
                 >
                   <Text>{file.filename}</Text>
                 </List.Item>
@@ -515,8 +597,34 @@ const NoteDetailPage: React.FC = () => {
           </Card>
         )}
 
+        {selectedPdfPreview && (
+          <Card
+            title={
+              <Space>
+                <PaperClipOutlined />
+                PDF Preview: {selectedPdfPreview.name}
+              </Space>
+            }
+            style={cardStyle}
+          >
+            <div
+              style={{
+                border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`,
+                borderRadius: 6,
+                overflow: "hidden",
+              }}
+            >
+              <iframe
+                src={selectedPdfPreview.url}
+                style={{ width: "100%", minHeight: "75vh", border: "none" }}
+                title={`Preview ${selectedPdfPreview.name}`}
+              />
+            </div>
+          </Card>
+        )}
+
         <Card title="Rating" style={cardStyle}>
-          <Space direction="vertical" size={4}>
+          <Space orientation="vertical" size={4}>
             <Space align="center">
               <Rate
                 allowHalf
@@ -552,18 +660,18 @@ const NoteDetailPage: React.FC = () => {
                 const author = comment.commenter_name || comment.commenter_email || String(comment.commenter_id);
                 return (
                   <List.Item style={{ alignItems: "flex-start", padding: "12px 0" }}>
-                    <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                    <Space orientation="vertical" size={4} style={{ width: "100%" }}>
                       <Space>
                         <Avatar
                           size="small"
-                          src={comment.commenter_profile_picture || undefined}
+                          src={toImageSrcIfNeeded(comment.commenter_profile_picture)}
                           icon={<UserOutlined />}
                           style={{ backgroundColor: "#0b5ed7" }}
                         />
                         <Text strong style={{ fontSize: 13 }}>
                           {author}
                         </Text>
-                        {Boolean(comment.is_lecturer) && <CheckCircleOutlined style={{ color: "#52c41a" }} />}
+                        {Boolean(comment.lecturer) && <CheckCircleOutlined style={{ color: "#52c41a" }} />}
                       </Space>
                       <Text style={{ fontSize: 14, paddingLeft: 28 }}>{comment.suggestion_data}</Text>
                     </Space>

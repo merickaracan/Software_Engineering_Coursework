@@ -1,4 +1,4 @@
-const db = require("../db");
+const db = require("../database/db");
 
 /**
  * Retrieves a user from the database by email (includes password hash)
@@ -25,7 +25,7 @@ const getUser = async (email) => {
 const getUserPublic = async (email) => {
     try {
         const [rows] = await db.query(
-            "SELECT id, name, email, is_lecturer, points, profile_picture FROM user_data WHERE email = ?",
+            "SELECT email, name, lecturer, points FROM user_data WHERE email = ?",
             [email]
         );
         return rows.length > 0 ? rows[0] : null;
@@ -40,11 +40,11 @@ const getUserPublic = async (email) => {
  * @returns {Promise<Object|null>} User record without password_hash or null if not found
  * @throws {Error} If the database query fails
  */
-const getUserById = async (id) => {
+const getUserByEmail = async (email) => {
     try {
         const [rows] = await db.query(
-            "SELECT id, name, email, is_lecturer, points, profile_picture FROM user_data WHERE id = ?",
-            [id]
+            "SELECT email, name, lecturer, points, profile_picture FROM user_data WHERE email = ?",
+            [email]
         );
         return rows.length > 0 ? rows[0] : null;
     } catch (err) {
@@ -84,7 +84,6 @@ const createUser = async (email, passkey, name = '', lecturer = 0, points = 0) =
  */
 const updateUser = async (email, passkey = null, lecturer = null, points = null) => {
     try {
-        const { name, password_hash, is_lecturer, points } = updates;
         const [result] = await db.query(
             "UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",
             [passkey, lecturer, points, email]
@@ -150,7 +149,7 @@ const deleteUser = async (email) => {
 module.exports = {
     getUser,
     getUserPublic,
-    getUserById,
+    getUserByEmail,
     createUser,
     updateUser,
     updateUserProfile,

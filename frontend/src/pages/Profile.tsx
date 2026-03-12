@@ -256,12 +256,12 @@ const Profile: React.FC = () => {
             {/* Profile header card */}
             <Card
               style={cardStyle}
-              bodyStyle={{
+              styles={{ body: {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 padding: "32px",
-              }}
+              }}}
             >
               <Avatar
                 size={96}
@@ -421,7 +421,7 @@ const Profile: React.FC = () => {
                           border: isDark ? "1px solid #303030" : "1px solid #e6eeff",
                           cursor: "pointer",
                         }}
-                        bodyStyle={{ padding: "16px 20px" }}
+                        styles={{ body: { padding: "16px 20px" } }}
                       >
                         <Row align="middle" justify="space-between" wrap>
                           <Col flex="auto">

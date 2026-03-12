@@ -2,15 +2,22 @@ module.exports = {
   testEnvironment: "node",
   coveragePathIgnorePatterns: [
     "/node_modules/",
-    "/dist/"
+    "/dist/",
+    "/coverage/"
   ],
   collectCoverageFrom: [
-    "**/*.js",
+    "routes/**/*.js",
+    "middleware/**/*.js",
+    "services/**/*.js",
+    "database/**/*.js",
+    "!**/__tests__/**",
     "!**/node_modules/**",
     "!**/dist/**",
-    "!**/__tests__/**",
-    "!**/index.js",
-    "!**/app.js"
+    "!**/coverage/**",
+    "!**/*.test.js",
+    "!jest.config.js",
+    "!index.js",
+    "!app.js"
   ],
   coverageThreshold: {
     global: {

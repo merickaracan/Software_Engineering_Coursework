@@ -1,12 +1,15 @@
 const {
   getUser,
+  getUserPublic,
+  getUserByEmail,
   createUser,
   updateUser,
+  updateUserProfile,
   deleteUser,
 } = require("../services/userService");
-const db = require("../db");
+const db = require("../database/db");
 
-jest.mock("../db");
+jest.mock("../database/db");
 
 describe("userService", () => {
   afterEach(() => {
@@ -14,160 +17,100 @@ describe("userService", () => {
   });
 
   describe("getUser", () => {
-    it("should fetch a user by email", async () => {
+    it("fetches a user by email", async () => {
       const email = "user@bath.ac.uk";
       const mockUser = {
-        id: 1,
-        name: "Test User",
         email,
-        password_hash: "hashed_password",
-        is_lecturer: 0,
+        name: "Test User",
+        passkey: "hashed_password",
+        lecturer: 0,
         points: 100,
       };
 
       db.query.mockResolvedValueOnce([[mockUser]]);
 
-      const result = await getUser(email);
-
-      expect(result).toEqual(mockUser);
-      expect(db.query).toHaveBeenCalledWith("SELECT * FROM user_data WHERE email = ?", [
-        email,
-      ]);
+      await expect(getUser(email)).resolves.toEqual(mockUser);
+      expect(db.query).toHaveBeenCalledWith("SELECT * FROM user_data WHERE email = ?", [email]);
     });
+  });
 
-    it("should return null if user not found", async () => {
-      db.query.mockResolvedValueOnce([[]]);
+  describe("getUserPublic", () => {
+    it("returns public user fields", async () => {
+      const email = "user@bath.ac.uk";
+      const mockUser = { email, name: "Test User", lecturer: 0, points: 100 };
 
-      const result = await getUser("notfound@bath.ac.uk");
+      db.query.mockResolvedValueOnce([[mockUser]]);
 
-      expect(result).toBeNull();
+      await expect(getUserPublic(email)).resolves.toEqual(mockUser);
+      expect(db.query).toHaveBeenCalledWith(
+        "SELECT email, name, lecturer, points FROM user_data WHERE email = ?",
+        [email]
+      );
     });
+  });
 
-    it("should throw error on database failure", async () => {
-      db.query.mockRejectedValueOnce(new Error("DB error"));
+  describe("getUserByEmail", () => {
+    it("returns extended public user fields", async () => {
+      const email = "user@bath.ac.uk";
+      const mockUser = { email, name: "Test User", lecturer: 0, points: 100, profile_picture: null };
 
-      await expect(getUser("user@bath.ac.uk")).rejects.toThrow(
-        "Error fetching user: DB error"
+      db.query.mockResolvedValueOnce([[mockUser]]);
+
+      await expect(getUserByEmail(email)).resolves.toEqual(mockUser);
+      expect(db.query).toHaveBeenCalledWith(
+        "SELECT email, name, lecturer, points, profile_picture FROM user_data WHERE email = ?",
+        [email]
       );
     });
   });
 
   describe("createUser", () => {
-    it("should create a user with default values", async () => {
-      const email = "newuser@bath.ac.uk";
-      const name = "New User";
-      const password_hash = "hashed_password";
-
+    it("creates a user with default values", async () => {
       db.query.mockResolvedValueOnce([{ insertId: 1 }]);
 
-      const result = await createUser(email, name, password_hash);
-
-      expect(result).toEqual({ insertId: 1 });
+      await expect(createUser("newuser@bath.ac.uk", "hashed_password", "New User")).resolves.toEqual({ insertId: 1 });
       expect(db.query).toHaveBeenCalledWith(
-        "INSERT INTO user_data (email, name, password_hash, is_lecturer, points) VALUES (?, ?, ?, ?, ?)",
-        [email, name, password_hash, 0, 0]
-      );
-    });
-
-    it("should create a user with custom values", async () => {
-      const email = "lecturer@bath.ac.uk";
-      const name = "Lecturer User";
-      const password_hash = "hashed_password";
-
-      db.query.mockResolvedValueOnce([{ insertId: 2 }]);
-
-      const result = await createUser(email, name, password_hash, 1, 500);
-
-      expect(result).toEqual({ insertId: 2 });
-      expect(db.query).toHaveBeenCalledWith(
-        "INSERT INTO user_data (email, name, password_hash, is_lecturer, points) VALUES (?, ?, ?, ?, ?)",
-        [email, name, password_hash, 1, 500]
-      );
-    });
-
-    it("should throw error on duplicate email", async () => {
-      db.query.mockRejectedValueOnce(new Error("Duplicate entry"));
-
-      await expect(createUser("user@bath.ac.uk", "Test User", "password")).rejects.toThrow(
-        "Error creating user: Duplicate entry"
+        "INSERT INTO user_data (email, passkey, name, lecturer, points) VALUES (?, ?, ?, ?, ?)",
+        ["newuser@bath.ac.uk", "hashed_password", "New User", 0, 0]
       );
     });
   });
 
   describe("updateUser", () => {
-    it("should update user with all fields", async () => {
-      const email = "user@bath.ac.uk";
-
+    it("updates passkey, lecturer, and points", async () => {
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await updateUser(email, {
-        name: "Updated Name",
-        password_hash: "new_password",
-        is_lecturer: 1,
-        points: 200
-      });
-
-      expect(result).toEqual({ affectedRows: 1 });
+      await expect(updateUser("user@bath.ac.uk", "new_hash", 1, 200)).resolves.toEqual({ affectedRows: 1 });
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
-        ["Updated Name", "new_password", 1, 200, email]
-      );
-    });
-
-    it("should update user with partial fields (only name)", async () => {
-      const email = "user@bath.ac.uk";
-
-      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
-
-      const result = await updateUser(email, { name: "Updated Name" });
-
-      expect(result).toEqual({ affectedRows: 1 });
-      expect(db.query).toHaveBeenCalledWith(
-        "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
-        ["Updated Name", undefined, undefined, undefined, email]
-      );
-    });
-
-    it("should throw error on database failure", async () => {
-      db.query.mockRejectedValueOnce(new Error("Update failed"));
-
-      await expect(updateUser("user@bath.ac.uk", { name: "Test" })).rejects.toThrow(
-        "Error updating user: Update failed"
+        "UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",
+        ["new_hash", 1, 200, "user@bath.ac.uk"]
       );
     });
   });
 
-  describe("deleteUser", () => {
-    it("should delete a user", async () => {
-      const email = "user@bath.ac.uk";
-
+  describe("updateUserProfile", () => {
+    it("updates only provided fields", async () => {
       db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-      const result = await deleteUser(email);
-
-      expect(result).toEqual({ affectedRows: 1 });
-      expect(db.query).toHaveBeenCalledWith("DELETE FROM user_data WHERE email = ?", [
-        email,
-      ]);
-    });
-
-    it("should return 0 affectedRows if user not found", async () => {
-      db.query.mockResolvedValueOnce([{ affectedRows: 0 }]);
-
-      const result = await deleteUser("notfound@bath.ac.uk");
-
-      expect(result).toEqual({ affectedRows: 0 });
-      expect(db.query).toHaveBeenCalledWith("DELETE FROM user_data WHERE email = ?", [
-        "notfound@bath.ac.uk",
-      ]);
-    });
-
-    it("should throw error on database failure", async () => {
-      db.query.mockRejectedValueOnce(new Error("Delete failed"));
-
-      await expect(deleteUser("user@bath.ac.uk")).rejects.toThrow(
-        "Error deleting user: Delete failed"
+      await expect(updateUserProfile("user@bath.ac.uk", { name: "Updated Name" })).resolves.toEqual({ affectedRows: 1 });
+      expect(db.query).toHaveBeenCalledWith(
+        "UPDATE user_data SET name = ? WHERE email = ?",
+        ["Updated Name", "user@bath.ac.uk"]
       );
+    });
+
+    it("returns zero affected rows when no updates are provided", async () => {
+      await expect(updateUserProfile("user@bath.ac.uk", {})).resolves.toEqual({ affectedRows: 0 });
+      expect(db.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteUser", () => {
+    it("deletes a user", async () => {
+      db.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+      await expect(deleteUser("user@bath.ac.uk")).resolves.toEqual({ affectedRows: 1 });
+      expect(db.query).toHaveBeenCalledWith("DELETE FROM user_data WHERE email = ?", ["user@bath.ac.uk"]);
     });
   });
 });

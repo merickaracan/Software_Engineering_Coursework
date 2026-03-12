@@ -2,9 +2,8 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
 const requireAuth = require("../middleware/requireAuth");
-const { getUser, createUser, updateUser, deleteUser } = require("../services/userService");
+const { getUser, createUser } = require("../services/userService");
 
 const JWT_SECRET = process.env.JWT_SECRET || "default";
 
@@ -71,11 +70,11 @@ function validateRegistration(data) {
 /**
  * POST /register
  * Registers a new user account
- * @param {Object} body - { name, email, password, is_lecturer? }
+ * @param {Object} body - { name, email, password, lecturer? }
  * @returns {Object} { ok: boolean, errors?: string[], message?: string }
  */
 router.post("/register", async (req, res) => {
-  const { name, email, password, is_lecturer } = req.body;
+  const { name, email, password, lecturer } = req.body;
 
   // Validate input
   const validationErrors = validateRegistration({ name, email, password });
@@ -101,7 +100,7 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Add data to database
-    await createUser(email, hashedPassword, name);
+    await createUser(email, hashedPassword, name, lecturer ? 1 : 0);
 
     res.json({
       ok: true,

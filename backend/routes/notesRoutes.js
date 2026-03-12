@@ -3,277 +3,173 @@ const router = express.Router();
 const db = require("../db");
 const requireAuth = require("../middleware/requireAuth");
 
-/**
- * GET /search
- * Searches for notes by title and/or author
- * @param {string} [title] - Note title to search for (partial match)
- * @param {string} [author] - Author email to search for (partial match)
- * @returns {Object} { ok: boolean, data: Note[], message?: string }
- */
-router.get("/search", async (req, res) => {
+// Leaderboard — must come before /notes/:id
+router.get("/notes/leaderboard", async (req, res) => {
     try {
-        const { title, author } = req.query;
-        let query = "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE 1=1";
-        const params = [];
-
-        if (title) {
-            query += " AND notes.title LIKE ?";
-            params.push(`%${title}%`);
-        }
-
-        if (author) {
-            query += " AND user_data.email LIKE ?";
-            params.push(`%${author}%`);
-        }
-
-        const [rows] = await db.query(query, params);
-        res.status(200).json({ ok: true, data: rows, message: "Search completed successfully" });
+        const [rows] = await db.query(`
+            SELECT
+                u.email,
+                u.name,
+                COUNT(n.id)                        AS totalNotes,
+                ROUND(COALESCE(AVG(n.rating_average), 0), 2) AS avgRating
+            FROM user_data u
+            INNER JOIN notes n ON n.email = u.email
+            GROUP BY u.email, u.name
+            ORDER BY avgRating DESC, totalNotes DESC
+        `);
+        res.status(200).json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * GET /notes/:id
- * Retrieves a specific note by ID
- * @param {number} id - Note ID
- * @returns {Object} { ok: boolean, data: Note[], message?: string }
- */
-router.get("/notes/:id", async (req, res) => {
+// Get all notes (for teacher)
+router.get("/notes", async (req, res) => {
     try {
-        const [rows] = await db.query(
-            "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE notes.id = ?",
-            [req.params.id]
-        );
-        if (rows.length === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
-        }
-        res.status(200).json({ ok: true, data: rows, message: "Note retrieved successfully" });
+        const [rows] = await db.query("SELECT * FROM notes ORDER BY id DESC");
+        res.status(200).json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * GET /notes/module/:module
- * Retrieves all notes for a specific module
- * @param {string} module - Module code (e.g., 'se', 'ml')
- * @returns {Object} { ok: boolean, data: Note[], message?: string }
- */
+// Specific segment routes before wildcard /:id
 router.get("/notes/module/:module", async (req, res) => {
     try {
-        const [rows] = await db.query(
-            "SELECT notes.*, user_data.email as owner_email FROM notes LEFT JOIN user_data ON notes.owner_id = user_data.id WHERE notes.module = ?",
-            [req.params.module]
-        );
-        res.status(200).json({ ok: true, data: rows, message: "Notes retrieved successfully" });
+        const [rows] = await db.query("SELECT * FROM notes WHERE module = ?", [req.params.module]);
+        res.status(200).json({ ok: true, data: rows });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * GET /notes/email/:email
- * Retrieves all notes created by a specific user (fixed N+1 query)
- * @param {string} email - User email
- * @returns {Object} { ok: boolean, data: Note[], message?: string }
- */
 router.get("/notes/email/:email", async (req, res) => {
     try {
-        // FIXED: Combined into single JOIN query (was 2 queries before)
+        const [rows] = await db.query("SELECT * FROM notes WHERE email = ?", [req.params.email]);
+        res.status(200).json({ ok: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// Check if a specific user has rated a note
+router.get("/notes/:id/rating/:email", async (req, res) => {
+    try {
         const [rows] = await db.query(
-            `SELECT notes.*, user_data.email as owner_email 
-             FROM notes 
-             JOIN user_data ON notes.owner_id = user_data.id 
-             WHERE user_data.email = ?`,
-            [req.params.email]
+            "SELECT rating FROM note_ratings WHERE note_id = ? AND rater_email = ?",
+            [req.params.id, req.params.email]
         );
-        res.status(200).json({ ok: true, data: rows, message: "User notes retrieved successfully" });
+        res.status(200).json({ ok: true, rated: rows.length > 0, rating: rows[0]?.rating ?? null });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * POST /notes
- * Creates a new note (requires authentication)
- * FIXED: Single query with automatic user lookup via auth token
- * @param {Object} body - { title, note_data, module, file? }
- * @returns {Object} { ok: boolean, data?: { id: number }, message: string }
- */
-router.post("/notes", requireAuth, async (req, res) => {
+// Submit a rating (one per user per note)
+router.post("/notes/:id/rate", async (req, res) => {
     try {
-        const { title, note_data, module, file } = req.body;
+        const { rater_email, rating } = req.body;
+        const note_id = req.params.id;
 
-        // Validate required fields
-        if (!title || !note_data || !module) {
-            return res.status(400).json({
-                ok: false,
-                message: "Missing required fields: title, note_data, module"
-            });
+        const [existing] = await db.query(
+            "SELECT id FROM note_ratings WHERE note_id = ? AND rater_email = ?",
+            [note_id, rater_email]
+        );
+        if (existing.length > 0) {
+            return res.status(409).json({ ok: false, error: "You have already rated this note." });
         }
 
-        // Use authenticated user's email from token
-        const userEmail = req.user.email;
+        await db.query(
+            "INSERT INTO note_ratings (note_id, rater_email, rating) VALUES (?, ?, ?)",
+            [note_id, rater_email, rating]
+        );
 
-        // FIXED: Optimized to single query - user lookup happens in auth middleware
-        const [userRows] = await db.query("SELECT id FROM user_data WHERE email = ?", [userEmail]);
-        if (userRows.length === 0) {
-            return res.status(400).json({ ok: false, message: "User not found" });
-        }
-        const owner_id = userRows[0].id;
+        // Recalculate average from all ratings
+        const [stats] = await db.query(
+            "SELECT AVG(rating) AS avg_rating, COUNT(*) AS total FROM note_ratings WHERE note_id = ?",
+            [note_id]
+        );
+        const newAvg = Number(stats[0].avg_rating).toFixed(2);
+        const newCount = stats[0].total;
 
+        await db.query(
+            "UPDATE notes SET rating_average = ?, number_ratings = ? WHERE id = ?",
+            [newAvg, newCount, note_id]
+        );
+
+        res.status(200).json({ ok: true, newAverage: Number(newAvg), newCount });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.get("/notes/:id", async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM notes WHERE id = ?", [req.params.id]);
+        res.status(200).json({ ok: true, data: rows });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post("/notes", async (req, res) => {
+    try {
+        const { email, verified, note_data, rating_average, number_ratings, module, note_title } = req.body;
         const [result] = await db.query(
-            "INSERT INTO notes (owner_id, title, note_data, module, file_name, file_type, file_size, file_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                owner_id,
-                title,
-                note_data,
-                module,
-                file?.name || null,
-                file?.type || null,
-                file?.size || 0,
-                file?.data || null
-            ]
+            "INSERT INTO notes (email,verified,note_data,rating_average,number_ratings,module,note_title) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [email, verified, note_data, rating_average, number_ratings, module, note_title]
         );
-
-        res.status(201).json({
-            ok: true,
-            data: { id: result.insertId },
-            message: "Note created successfully"
-        });
+        return res.status(201).json({ ok: true, message: "Note created", insertId: result.insertId });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * DELETE /notes/:id
- * Deletes a note (requires authentication and ownership)
- * @param {number} id - Note ID
- * @returns {Object} { ok: boolean, message: string }
- */
-router.delete("/notes/:id", requireAuth, async (req, res) => {
+router.delete("/notes/:id", async (req, res) => {
     try {
-        // Verify ownership before deleting
-        const [noteRows] = await db.query(
-            "SELECT notes.owner_id, user_data.email FROM notes JOIN user_data ON notes.owner_id = user_data.id WHERE notes.id = ?",
-            [req.params.id]
-        );
-
-        if (noteRows.length === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
-        }
-
-        if (noteRows[0].email !== req.user.email) {
-            return res.status(403).json({ ok: false, message: "Unauthorized - can only delete own notes" });
-        }
-
         const [result] = await db.query("DELETE FROM notes WHERE id = ?", [req.params.id]);
-        res.status(200).json({ ok: true, message: "Note deleted successfully" });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ ok: false, error: "Note not found" });
+        }
+        return res.status(200).json({ ok: true, message: "Note deleted" });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * PUT /notes/:id
- * Updates a note (requires authentication and ownership)
- * @param {number} id - Note ID
- * @param {Object} body - { title?, note_data?, module?, file? }
- * @returns {Object} { ok: boolean, message: string }
- */
-router.put("/notes/:id", requireAuth, async (req, res) => {
+router.put("/notes/:id", async (req, res) => {
     try {
-        const { title, note_data, module, file } = req.body;
-
-        // Verify ownership before updating
-        const [noteRows] = await db.query(
-            "SELECT notes.owner_id, user_data.email FROM notes JOIN user_data ON notes.owner_id = user_data.id WHERE notes.id = ?",
-            [req.params.id]
-        );
-
-        if (noteRows.length === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
-        }
-
-        if (noteRows[0].email !== req.user.email) {
-            return res.status(403).json({ ok: false, message: "Unauthorized - can only update own notes" });
-        }
-
+        const { email, verified, note_data, rating_average, number_ratings, module, note_title } = req.body;
         const [result] = await db.query(
-            "UPDATE notes SET title = ?, note_data = ?, module = ?, file_name = ?, file_type = ?, file_size = ?, file_data = ?, updated_at = datetime('now') WHERE id = ?",
-            [
-                title,
-                note_data,
-                module,
-                file?.name || null,
-                file?.type || null,
-                file?.size || 0,
-                file?.data || null,
-                req.params.id
-            ]
+            "UPDATE notes SET email=?,verified=?,note_data=?,rating_average=?,number_ratings=?,module=?,note_title=? WHERE id=?",
+            [email, verified, note_data, rating_average, number_ratings, module, note_title, req.params.id]
         );
-
         if (result.affectedRows === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
+            return res.status(404).json({ ok: false, error: "Note not found" });
         }
-
-        res.status(200).json({ ok: true, message: "Note updated successfully" });
+        return res.status(200).json({ ok: true, message: "Note updated" });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * PUT /notes/verify/:id
- * Verifies a note (requires authentication and lecturer status)
- * @param {number} id - Note ID
- * @returns {Object} { ok: boolean, message: string }
- */
-/**
- * PUT /notes/verify/:id
- * Verifies a note (requires authentication and lecturer status)
- * @param {number} id - Note ID
- * @returns {Object} { ok: boolean, message: string }
- */
-router.put("/notes/verify/:id", requireAuth, async (req, res) => {
+router.put("/notes/verify/:id", async (req, res) => {
     try {
-        const [userRows] = await db.query("SELECT is_lecturer FROM user_data WHERE email = ?", [req.user.email]);
-        if (!userRows.length || userRows[0].is_lecturer !== 1) {
-            return res.status(403).json({ ok: false, message: "Only lecturers can verify notes" });
-        }
-
-        const [result] = await db.query("UPDATE notes SET is_verified = ? WHERE id = ?", [1, req.params.id]);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
-        }
-        res.status(200).json({ ok: true, message: "Note verified successfully" });
+        const [result] = await db.query("UPDATE notes SET verified=1 WHERE id=?", [req.params.id]);
+        if (result.affectedRows === 0) return res.status(404).json({ ok: false, error: "Note not found" });
+        return res.status(200).json({ ok: true, message: "Note verified" });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * PUT /notes/unverify/:id
- * Unverifies a note (requires authentication and lecturer status)
- * @param {number} id - Note ID
- * @returns {Object} { ok: boolean, message: string }
- */
-router.put("/notes/unverify/:id", requireAuth, async (req, res) => {
+router.put("/notes/unverify/:id", async (req, res) => {
     try {
-        const [userRows] = await db.query("SELECT is_lecturer FROM user_data WHERE email = ?", [req.user.email]);
-        if (!userRows.length || userRows[0].is_lecturer !== 1) {
-            return res.status(403).json({ ok: false, message: "Only lecturers can unverify notes" });
-        }
-
-        const [result] = await db.query("UPDATE notes SET is_verified = ? WHERE id = ?", [0, req.params.id]);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ ok: false, message: "Note not found" });
-        }
-        res.status(200).json({ ok: true, message: "Note unverified successfully" });
+        const [result] = await db.query("UPDATE notes SET verified=0 WHERE id=?", [req.params.id]);
+        if (result.affectedRows === 0) return res.status(404).json({ ok: false, error: "Note not found" });
+        return res.status(200).json({ ok: true, message: "Note unverified" });
     } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 

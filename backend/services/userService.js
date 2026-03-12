@@ -55,18 +55,17 @@ const getUserById = async (id) => {
 /**
  * Creates a new user in the database
  * @param {string} email - User's email address
- * @param {string} name - User's full name
- * @param {string} password_hash - User's hashed password
- * @param {number} [is_lecturer=0] - Whether user is a lecturer (0 or 1)
+ * @param {string} passkey - User's hashed password
+ * @param {number} [lecturer=0] - Whether user is a lecturer (0 or 1)
  * @param {number} [points=0] - User's initial points
  * @returns {Promise<Object>} Insert result with insertId
  * @throws {Error} If the database query fails
  */
-const createUser = async (email, name, password_hash, is_lecturer = 0, points = 0) => {
+const createUser = async (email, passkey, name = '', lecturer = 0, points = 0) => {
     try {
         const [result] = await db.query(
-            "INSERT INTO user_data (email, name, password_hash, is_lecturer, points) VALUES (?, ?, ?, ?, ?)",
-            [email, name, password_hash, is_lecturer, points]
+            "INSERT INTO user_data (email, passkey, name, lecturer, points) VALUES (?, ?, ?, ?, ?)",
+            [email, passkey, name, lecturer, points]
         );
         return result;
     } catch (err) {
@@ -77,20 +76,18 @@ const createUser = async (email, name, password_hash, is_lecturer = 0, points = 
 /**
  * Updates an existing user's information in the database
  * @param {string} email - User's email address (used as identifier)
- * @param {Object} updates - Fields to update
- * @param {string} [updates.name] - User's full name
- * @param {string} [updates.password_hash] - New hashed password
- * @param {number} [updates.is_lecturer] - New lecturer status (0 or 1)
- * @param {number} [updates.points] - New points value
+ * @param {string|null} [passkey=null] - New hashed password (optional)
+ * @param {number|null} [lecturer=null] - New lecturer status (optional)
+ * @param {number|null} [points=null] - New points value (optional)
  * @returns {Promise<Object>} Update result with affectedRows
  * @throws {Error} If the database query fails
  */
-const updateUser = async (email, updates = {}) => {
+const updateUser = async (email, passkey = null, lecturer = null, points = null) => {
     try {
         const { name, password_hash, is_lecturer, points } = updates;
         const [result] = await db.query(
-            "UPDATE user_data SET name = ?, password_hash = ?, is_lecturer = ?, points = ? WHERE email = ?",
-            [name, password_hash, is_lecturer, points, email]
+            "UPDATE user_data SET passkey = ?, lecturer = ?, points = ? WHERE email = ?",
+            [passkey, lecturer, points, email]
         );
         return result;
     } catch (err) {

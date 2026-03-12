@@ -20,21 +20,17 @@ import {
 import type { UploadFile } from "antd";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
-import { createNote } from "../api/notes";
+import { AVAILABLE_MODULES } from "../components/Modules";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 const { TextArea } = Input;
 const { Dragger } = Upload;
 
-const MODULES = [
-  { value: "se", label: "Software Engineering" },
-  { value: "ml", label: "Machine Learning" },
-  { value: "sa", label: "Systems Architecture" },
-  { value: "vc", label: "Visual Computing" },
-  { value: "db", label: "Databases" },
-  { value: "ai", label: "Artificial Intelligence" },
-];
+const MODULE_OPTIONS = AVAILABLE_MODULES.map((m) => ({
+  value: m.code,
+  label: `${m.name} (${m.code})`,
+}));
 
 const CreateNotePage: React.FC = () => {
   const { isDark } = useTheme();
@@ -43,6 +39,7 @@ const CreateNotePage: React.FC = () => {
   const [description, setDescription] = useState("");
   const [module, setModule] = useState<string | undefined>(undefined);
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const cardStyle: React.CSSProperties = {
     borderRadius: 12,
@@ -62,58 +59,71 @@ const CreateNotePage: React.FC = () => {
       return;
     }
 
+    const storedUser = localStorage.getItem("user");
+    const currentUser = storedUser ? JSON.parse(storedUser) : null;
+    const email = currentUser?.email ?? "";
+
+    setLoading(true);
     try {
-      const storedUser = localStorage.getItem("user");
-      const currentUser = storedUser ? JSON.parse(storedUser) : null;
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          note_title: title.trim(),
+          note_data: description.trim(),
+          module,
+          verified: 0,
+          rating_average: 0,
+          number_ratings: 0,
+        }),
+      });
 
-      if (!currentUser || !currentUser.email) {
-        message.error("Please log in first.");
-        navigate("/login");
-        return;
-      }
+      const data = await response.json();
 
-      // Convert file to base64 if provided
-      let fileData: any = null;
-      if (fileList.length > 0 && fileList[0].originFileObj) {
-        const base64 = await fileToBase64(fileList[0].originFileObj);
-        fileData = {
-          name: fileList[0].name,
-          type: fileList[0].type || 'application/octet-stream',
-          size: fileList[0].size || 0,
-          data: base64
-        };
-      }
-
-      // Call backend API to create note
-      const response = await createNote(
-        currentUser.email,
-        title.trim(),
-        description.trim(),
-        module,
-        fileData
-      );
-      
       if (!response.ok) {
-        message.error(response.error || "Failed to create note.");
+        message.error(data.error ?? "Failed to create note.");
         return;
       }
+
+      const noteId = data.insertId ?? Date.now().toString();
+
+      // Upload any attached files
+      if (fileList.length > 0) {
+        const formData = new FormData();
+        fileList.forEach((f) => {
+          if (f.originFileObj) formData.append("files", f.originFileObj);
+        });
+        await fetch(`/api/notes/${noteId}/files`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+      }
+
+      // Also save to localStorage so MyNotesPage stays in sync
+      const localNote = {
+        id: String(noteId),
+        title: title.trim(),
+        description: description.trim(),
+        module,
+        files: fileList.map((f) => f.name),
+        createdAt: new Date().toISOString(),
+        ownerEmail: email,
+      };
+      const stored = localStorage.getItem("myNotes");
+      const notes = stored ? JSON.parse(stored) : [];
+      notes.push(localNote);
+      localStorage.setItem("myNotes", JSON.stringify(notes));
 
       message.success("Note created successfully!");
-      setTimeout(() => navigate("/my-notes"), 500);
-    } catch (error) {
-      console.error("Error creating note:", error);
-      message.error("Failed to create note. Please try again.");
+      setTimeout(() => navigate(`/modules/${module}`), 500);
+    } catch {
+      message.error("A network error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // Helper function to convert file to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
   };
 
   return (
@@ -147,7 +157,9 @@ const CreateNotePage: React.FC = () => {
                     size="large"
                     value={module}
                     onChange={setModule}
-                    options={MODULES}
+                    options={MODULE_OPTIONS}
+                    showSearch
+                    optionFilterProp="label"
                     style={{ width: "100%", borderRadius: 8 }}
                   />
                 </div>
@@ -206,6 +218,7 @@ const CreateNotePage: React.FC = () => {
                   size="large"
                   icon={<UploadOutlined />}
                   block
+                  loading={loading}
                   onClick={handleSubmit}
                   style={{
                     backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",

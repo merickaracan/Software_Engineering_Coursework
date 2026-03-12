@@ -3,35 +3,65 @@ const router = express.Router();
 const requireAuth = require("../middleware/requireAuth");
 const { getUserById, getUserPublic, updateUserProfile, deleteUser } = require("../services/userService");
 
-/**
- * GET /users/id/:id
- * Retrieves a user's public profile by ID
- * @param {number} id - User ID
- * @returns {Object} { ok: boolean, data: User[], message?: string }
- */
 router.get("/users/id/:id", async (req, res) => {
-    try {
-        const user = await getUserById(req.params.id);
-        if (!user) {
-            return res.status(404).json({ ok: false, message: "User not found" });
-        }
-        res.status(200).json({ ok: true, data: [user], message: "User retrieved successfully" });
-    } catch (err) {
-        res.status(500).json({ ok: false, message: err.message });
+    try{
+        const [rows] = await db.query("SELECT * FROM user_data WHERE id = ?",[req.params.id]);
+        res.status(200).json({ ok: true, data: rows });
+    }
+    catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-/**
- * GET /users/:email
- * Retrieves a user's public profile by email
- * @param {string} email - User email
- * @returns {Object} { ok: boolean, data: User[], message?: string }
- */
 router.get("/users/:email", async (req, res) => {
+    try{
+        const [rows] = await db.query("SELECT * FROM user_data WHERE email = ?",[req.params.email]);
+        res.status(200).json({ ok: true, data: rows });
+    }
+    catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.put("/users/:email/profile-picture", async (req, res) => {
     try {
-        const user = await getUserPublic(req.params.email);
-        if (!user) {
-            return res.status(404).json({ ok: false, message: "User not found" });
+        const { profile_picture } = req.body;
+        const [result] = await db.query(
+            "UPDATE user_data SET profile_picture = ? WHERE email = ?",
+            [profile_picture || null, req.params.email]
+        );
+
+        if (result.affectedRows == 0) {
+            return res.status(404).json({ ok: false, error: "User not found" });
+        }
+
+        return res.status(200).json({ ok: true, message: "Profile picture updated" });
+    }
+    catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post("/users",async (req,res) =>{
+    try{
+        const {email, name, password_hash,is_lecturer,points,profile_picture} = req.body;
+        const [result] = await db.query("INSERT INTO user_data (email, name, password_hash,is_lecturer,points,profile_picture) VALUES (?, ?, ?, ?, ?, ?)",[email, name, password_hash,is_lecturer,points,profile_picture || null]);
+        return res.status(201).json({
+            ok: true,
+            message: "User created",
+            insertId: result.insertId
+        });
+    }
+    catch (err){
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.delete("/users/:email", async (req,res) =>{
+    try{
+        const [result] = await db.query("DELETE FROM user_data WHERE email = ?",[req.params.email]);
+        if (result.affectedRows == 0){
+            return res.status(404).json({ ok: false, error: "User not found" });
         }
         res.status(200).json({ ok: true, data: [user], message: "User retrieved successfully" });
     } catch (err) {

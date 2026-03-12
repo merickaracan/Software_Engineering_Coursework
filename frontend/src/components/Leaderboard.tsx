@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Row, Typography, Card, Rate, Table, Tag, Empty } from "antd";
+import { Row, Typography, Card, Rate, Table, Tag } from "antd";
 import { TrophyOutlined } from "@ant-design/icons";
 import { useTheme } from "./ThemeContext";
 
@@ -13,9 +13,9 @@ interface LeaderboardEntry {
 }
 
 const rankColors: Record<number, string> = {
-  1: "#ffeb00",
+  1: "#FFD700",
   2: "#C0C0C0",
-  3: "#CD7F32",
+  3: "#E8913D",
 };
 
 const rankLabels: Record<number, string> = {
@@ -26,28 +26,25 @@ const rankLabels: Record<number, string> = {
 
 interface LeaderboardProps {
   onTitleClick?: () => void;
+  limit?: number;
 }
 
-const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
+const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick, limit }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const { isDark } = useTheme();
 
   useEffect(() => {
-    const stored = localStorage.getItem("leaderboard");
-    if (!stored) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(stored);
-      setLeaderboard(Array.isArray(parsed) ? parsed : []);
-    } catch (error) {
-      console.error("Invalid leaderboard data in localStorage:", error);
-      setLeaderboard([]);
-    }
+    fetch("/api/notes/leaderboard", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: { data?: LeaderboardEntry[] }) => setLeaderboard(data?.data ?? []))
+      .catch(() => setLeaderboard([]));
   }, []);
 
-  const sorted = [...leaderboard].sort((a, b) => b.avgRating - a.avgRating);
+  const sorted = [...leaderboard].sort((a, b) => Number(b.avgRating) - Number(a.avgRating));
+  const displayData = limit ? sorted.slice(0, limit) : sorted;
+
+  const textColor = isDark ? "#d9d9d9" : "rgba(0,0,0,0.88)";
+  const secondaryColor = isDark ? "#8c8c8c" : "rgba(0,0,0,0.45)";
 
   const columns = [
     {
@@ -59,11 +56,11 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
         if (rank <= 3) {
           return (
             <Tag
-              color={rankColors[rank]}
               style={{
+                backgroundColor: rankColors[rank],
                 fontWeight: 700,
                 fontSize: 14,
-                color: rank === 2 ? "#333" : "#fff",
+                color: rank === 1 ? "#7A5800" : rank === 2 ? "#333" : "#fff",
                 border: "none",
                 borderRadius: 6,
                 padding: "2px 10px",
@@ -73,26 +70,26 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
             </Tag>
           );
         }
-        return <Text style={{ fontWeight: 500, paddingLeft: 8 }}>{rank}th</Text>;
+        return <Text style={{ fontWeight: 500, paddingLeft: 8, color: textColor }}>{rank}th</Text>;
       },
     },
     {
       title: "Name",
       dataIndex: "name",
       key: "name",
-      render: (name: string) => <Text strong>{name}</Text>,
+      render: (name: string) => <Text strong style={{ color: textColor }}>{name}</Text>,
     },
     {
       title: "Email",
       dataIndex: "email",
       key: "email",
-      render: (email: string) => <Text style={{ fontSize: 13 }}>{email}</Text>,
+      render: (email: string) => <Text style={{ fontSize: 13, color: textColor }}>{email}</Text>,
     },
     {
       title: "Total Notes Shared",
       dataIndex: "totalNotes",
       key: "totalNotes",
-      render: (count: number) => <Text>{count}</Text>,
+      render: (count: number) => <Text style={{ color: textColor }}>{String(count)}</Text>,
     },
     {
       title: "Avg Rating per Note",
@@ -100,16 +97,10 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
       key: "avgRating",
       render: (rating: number) => (
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Rate disabled allowHalf value={rating} style={{ fontSize: 16 }} />
-          <Text type="secondary" style={{ fontSize: 13 }}>{rating.toFixed(1)}</Text>
+          <Rate disabled allowHalf value={Number(rating)} style={{ fontSize: 16 }} />
+          <Text style={{ fontSize: 13, color: secondaryColor }}>{Number(rating).toFixed(1)}</Text>
         </span>
       ),
-    },
-    {
-      title: "Notes Shared",
-      dataIndex: "totalNotes",
-      key: "totalNotes",
-      render: (count: number) => <Text>{count}</Text>,
     },
   ];
 
@@ -134,7 +125,7 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ onTitleClick }) => {
         }}
       >
         <Table
-          dataSource={sorted}
+          dataSource={displayData}
           columns={columns}
           rowKey="email"
           pagination={false}

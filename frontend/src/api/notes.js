@@ -107,11 +107,11 @@ const createNote = async (ownerEmail, title, noteData, module, file = null) => {
  * @param {string|null} [title=null] - New note title (optional)
  * @param {string|null} [noteData=null] - New note content (optional)
  * @param {string|null} [module=null] - New module code (optional)
- * @param {Object|null} [file=null] - Optional file object with {name, type, size, data}
+ * @param {string|null} [noteTitle=null] - New note title (optional)
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const updateNote = async (id, title = null, noteData = null, module = null, file = null) => {
+const updateNote = async (id, noteData = null, module = null, noteTitle = null) => {
     try {
         const response = await fetch(`/api/notes/${id}`, {
             method: "PUT",
@@ -120,10 +120,9 @@ const updateNote = async (id, title = null, noteData = null, module = null, file
             },
             credentials: "include",
             body: JSON.stringify({
-                title: title,
                 note_data: noteData,
-                module: module,
-                file: file
+                module,
+                note_title: noteTitle,
             })
         });
         const data = await response.json();

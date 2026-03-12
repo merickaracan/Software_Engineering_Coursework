@@ -1,67 +1,95 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Layout,
   Typography,
   Card,
   Tag,
   Button,
-  Empty,
   Space,
-  Popconfirm,
-  message,
-  Spin,
+  Rate,
   Input,
   List,
   Avatar,
+  Spin,
+  Empty,
+  message,
 } from "antd";
 import {
   ArrowLeftOutlined,
   EditOutlined,
-  DeleteOutlined,
   FileTextOutlined,
-  CalendarOutlined,
-  PaperClipOutlined,
-  DownloadOutlined,
   UserOutlined,
+  SendOutlined,
   CheckCircleOutlined,
+  DownloadOutlined,
+  PaperClipOutlined,
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
-import { getNoteById, deleteNote, verifyNote, unverifyNote } from "../api/notes";
-import { getSuggestionsByNoteId, createSuggestion } from "../api/suggestions";
-import { getUser } from "../api/users";
 
 const { Title, Text, Paragraph } = Typography;
 const { Content } = Layout;
 
-interface Note {
-  id: string;
-  owner_id: number;
-  owner_email: string;
-  title: string;
-  note_data: string;
-  module: string;
-  is_verified: number;
-  created_at: string;
-  updated_at: string;
+interface RawNote {
+  id: number | string;
+  title?: string;
+  note_title?: string;
+  note_data?: string;
+  module?: string;
+  owner_email?: string;
+  email?: string;
+  is_verified?: number;
+  verified?: number;
+  rating_average?: number;
+  number_ratings?: number;
+  created_at?: string;
   file_name?: string;
   file_type?: string;
   file_size?: number;
   file_data?: string;
 }
 
-interface Comment {
+interface NoteView {
+  id: number;
+  title: string;
+  content: string;
+  module: string;
+  ownerEmail: string;
+  verified: number;
+  ratingAverage: number;
+  numberRatings: number;
+  createdAt?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
+  fileData?: string;
+}
+
+interface CommentItem {
   id: number;
   note_id: number;
-  commenter_id: number;
+  commenter_id: number | string;
   suggestion_data: string;
-  created_at: string;
+  created_at?: string;
   commenter_name?: string;
   commenter_email?: string;
   commenter_profile_picture?: string;
-  is_lecturer?: boolean;
+  is_lecturer?: number | boolean;
+}
+
+interface NoteFile {
+  id: number;
+  note_id: number;
+  filename: string;
+  stored_name: string;
+  uploaded_at: string;
+}
+
+interface UserSession {
+  id?: number;
+  email?: string;
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -73,177 +101,255 @@ const MODULE_LABELS: Record<string, string> = {
   ai: "Artificial Intelligence",
 };
 
+const normalizeNote = (raw: RawNote): NoteView => ({
+  id: Number(raw.id),
+  title: raw.title ?? raw.note_title ?? "Untitled Note",
+  content: raw.note_data ?? "",
+  module: raw.module ?? "",
+  ownerEmail: raw.owner_email ?? raw.email ?? "",
+  verified: Number(raw.is_verified ?? raw.verified ?? 0),
+  ratingAverage: Number(raw.rating_average ?? 0),
+  numberRatings: Number(raw.number_ratings ?? 0),
+  createdAt: raw.created_at,
+  fileName: raw.file_name,
+  fileType: raw.file_type,
+  fileSize: raw.file_size,
+  fileData: raw.file_data,
+});
+
+const formatFileSize = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return "0 Bytes";
+  const units = ["Bytes", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${Math.round((bytes / Math.pow(1024, index)) * 100) / 100} ${units[index]}`;
+};
+
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isDark } = useTheme();
-  const [note, setNote] = useState<Note | null | undefined>(undefined);
-  const [isOwner, setIsOwner] = useState(false);
+
+  const currentUser: UserSession = useMemo(() => {
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : {};
+  }, []);
+
+  const [note, setNote] = useState<NoteView | null>(null);
   const [loading, setLoading] = useState(true);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [noteFiles, setNoteFiles] = useState<NoteFile[]>([]);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [isLecturer, setIsLecturer] = useState(false);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+  const [hasRated, setHasRated] = useState(false);
+
+  const isOwner = Boolean(note && currentUser.email && note.ownerEmail === currentUser.email);
 
   useEffect(() => {
-    const fetchNote = async () => {
+    const fetchCurrentUserRole = async () => {
+      if (!currentUser.email) {
+        setIsLecturer(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/users/${encodeURIComponent(currentUser.email)}`, {
+          credentials: "include",
+        });
+        const data = await response.json();
+        const userData = data?.ok && Array.isArray(data.data) ? data.data[0] : null;
+        setIsLecturer(userData?.is_lecturer === 1);
+      } catch {
+        setIsLecturer(false);
+      }
+    };
+
+    fetchCurrentUserRole();
+  }, [currentUser.email]);
+
+  useEffect(() => {
+    const fetchAll = async () => {
       if (!id) {
         setNote(null);
         setLoading(false);
         return;
       }
 
+      setLoading(true);
       try {
-        const response = await getNoteById(id);
-        
-        if (response.ok && response.data && response.data.length > 0) {
-          const foundNote = response.data[0];
-          setNote(foundNote);
+        const noteResponse = await fetch(`/api/notes/${id}`, { credentials: "include" });
+        const noteData = await noteResponse.json();
+        const noteRow: RawNote | undefined = noteData?.data?.[0];
 
-          const storedUser = localStorage.getItem("user");
-          const currentUser = storedUser ? JSON.parse(storedUser) : null;
-          // Check if current user is the owner
-          setIsOwner(currentUser?.email === foundNote.owner_email);
-        } else {
+        if (!noteData?.ok || !noteRow) {
           setNote(null);
+          return;
+        }
+
+        const normalized = normalizeNote(noteRow);
+        setNote(normalized);
+
+        const [commentsRes, filesRes] = await Promise.all([
+          fetch(`/api/suggestions/note/${id}`, { credentials: "include" }),
+          fetch(`/api/notes/${id}/files`, { credentials: "include" }),
+        ]);
+
+        const commentsData = await commentsRes.json().catch(() => ({ ok: false, data: [] }));
+        const filesData = await filesRes.json().catch(() => ({ ok: false, data: [] }));
+
+        setComments(Array.isArray(commentsData?.data) ? commentsData.data : []);
+        setNoteFiles(Array.isArray(filesData?.data) ? filesData.data : []);
+
+        if (currentUser.email) {
+          const ratingRes = await fetch(
+            `/api/notes/${id}/rating/${encodeURIComponent(currentUser.email)}`,
+            { credentials: "include" }
+          );
+          const ratingData = await ratingRes.json().catch(() => ({ rated: false }));
+
+          if (ratingData?.rated) {
+            setHasRated(true);
+            setUserRating(Number(ratingData.rating));
+          } else {
+            setHasRated(false);
+            setUserRating(0);
+          }
         }
       } catch (error) {
-        console.error("Error fetching note:", error);
+        console.error("Error loading note detail:", error);
         setNote(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchNote();
-  }, [id]);
+    fetchAll();
+  }, [id, currentUser.email]);
 
-  useEffect(() => {
-    const fetchCurrentUserRole = async () => {
-      const storedUser = localStorage.getItem("user");
-      const currentUser = storedUser ? JSON.parse(storedUser) : null;
-      if (!currentUser?.email) {
-        setIsLecturer(false);
+  const refreshComments = async () => {
+    if (!id) return;
+
+    try {
+      setCommentsLoading(true);
+      const response = await fetch(`/api/suggestions/note/${id}`, { credentials: "include" });
+      const data = await response.json();
+      setComments(Array.isArray(data?.data) ? data.data : []);
+    } catch {
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleVerifyToggle = async () => {
+    if (!note || !id) return;
+
+    const endpoint = note.verified === 1 ? `/api/notes/unverify/${id}` : `/api/notes/verify/${id}`;
+
+    try {
+      setVerificationLoading(true);
+      const response = await fetch(endpoint, { method: "PUT", credentials: "include" });
+      const data = await response.json();
+
+      if (!data?.ok) {
+        message.error(data?.error || data?.message || "Failed to update verification status");
         return;
       }
 
-      try {
-        const response = await getUser(currentUser.email);
-        const userData = response?.ok && Array.isArray(response.data) ? response.data[0] : null;
-        setIsLecturer(userData?.is_lecturer === 1);
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-        setIsLecturer(false);
+      setNote((prev) => (prev ? { ...prev, verified: prev.verified === 1 ? 0 : 1 } : prev));
+      message.success(note.verified === 1 ? "Note marked as unverified" : "Note marked as teacher verified");
+    } catch {
+      message.error("Failed to update verification status");
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+
+  const handleRate = async (value: number) => {
+    if (!note || !id || isOwner || hasRated) return;
+
+    try {
+      const response = await fetch(`/api/notes/${id}/rate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ rater_email: currentUser.email, rating: value }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        message.error(data?.error || "Failed to submit rating");
+        return;
       }
-    };
 
-    fetchCurrentUserRole();
-  }, []);
-
-  // Fetch comments for this note
-  useEffect(() => {
-    const fetchComments = async () => {
-      if (!id) return;
-      
-      try {
-        setCommentsLoading(true);
-        const response = await getSuggestionsByNoteId(Number(id));
-        
-        if (response.ok && response.data) {
-          setComments(response.data);
-        }
-      } catch (error) {
-        console.error("Error fetching comments:", error);
-      } finally {
-        setCommentsLoading(false);
-      }
-    };
-
-    fetchComments();
-  }, [id]);
+      setUserRating(value);
+      setHasRated(true);
+      setNote((prev) =>
+        prev
+          ? {
+              ...prev,
+              ratingAverage: Number(data.newAverage ?? prev.ratingAverage),
+              numberRatings: Number(data.newCount ?? prev.numberRatings),
+            }
+          : prev
+      );
+      message.success("Rating submitted");
+    } catch {
+      message.error("Failed to submit rating");
+    }
+  };
 
   const handleAddComment = async () => {
-    if (!commentText.trim()) {
+    if (!id || !note || !commentText.trim()) {
       message.warning("Please enter a comment");
       return;
     }
 
     try {
       setSubmittingComment(true);
-      const storedUser = localStorage.getItem("user");
-      const currentUser = storedUser ? JSON.parse(storedUser) : null;
+      const response = await fetch("/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          note_id: Number(id),
+          commenter_id: currentUser.id ?? currentUser.email ?? "anonymous",
+          suggestion_data: commentText.trim(),
+          note_owner_id: note.ownerEmail,
+        }),
+      });
 
-      if (!currentUser?.id || !id) {
-        message.error("Unable to post comment");
+      const data = await response.json();
+      if (!response.ok || !data?.ok) {
+        message.error(data?.error || data?.message || "Failed to add comment");
         return;
       }
 
-      const response = await createSuggestion(
-        currentUser.id,
-        commentText,
-        Number(id)
-      );
-
-      if (response.ok) {
-        message.success("Comment added successfully");
-        setCommentText("");
-        // Refresh comments
-        const commentsResponse = await getSuggestionsByNoteId(Number(id));
-        if (commentsResponse.ok && commentsResponse.data) {
-          setComments(commentsResponse.data);
-        }
-      } else {
-        message.error(response.error || "Failed to add comment");
-      }
-    } catch (error) {
-      console.error("Error adding comment:", error);
+      setCommentText("");
+      await refreshComments();
+      message.success("Comment added");
+    } catch {
       message.error("Failed to add comment");
     } finally {
       setSubmittingComment(false);
     }
   };
 
-  const handleDelete = async () => {
-    try {
-      if (!id) return;
-      
-      const response = await deleteNote(id);
-      
-      if (!response.ok) {
-        message.error(response.error || "Failed to delete note.");
-        return;
-      }
-      
-      message.success("Note deleted successfully.");
-      setTimeout(() => navigate("/my-notes"), 500);
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      message.error("Failed to delete note. Please try again.");
+  const handleDownloadInlineFile = () => {
+    if (!note?.fileData || !note.fileName) {
+      message.error("File data not available");
+      return;
     }
-  };
 
-  const handleToggleVerification = async () => {
-    if (!id || !note) return;
-
-    try {
-      setVerificationLoading(true);
-      const response = note.is_verified === 1 ? await unverifyNote(id) : await verifyNote(id);
-
-      if (!response.ok) {
-        message.error(response.error || "Failed to update verification status");
-        return;
-      }
-
-      setNote({ ...note, is_verified: note.is_verified === 1 ? 0 : 1 });
-      message.success(note.is_verified === 1 ? "Note marked as unverified" : "Note marked as teacher verified");
-    } catch (error) {
-      console.error("Error toggling note verification:", error);
-      message.error("Failed to update verification status");
-    } finally {
-      setVerificationLoading(false);
-    }
+    const link = document.createElement("a");
+    link.href = note.fileData;
+    link.download = note.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const cardStyle: React.CSSProperties = {
@@ -254,16 +360,22 @@ const NoteDetailPage: React.FC = () => {
     marginBottom: 24,
   };
 
-  if (note === null) {
+  if (loading) {
+    return (
+      <PageLayout>
+        <Content style={{ padding: "32px", textAlign: "center" }}>
+          <Spin size="large" />
+        </Content>
+      </PageLayout>
+    );
+  }
+
+  if (!note) {
     return (
       <PageLayout>
         <Content style={{ padding: "32px" }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate("/my-notes")}
-            style={{ marginBottom: 24, borderRadius: 8 }}
-          >
-            Back to My Notes
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ marginBottom: 24, borderRadius: 8 }}>
+            Back
           </Button>
           <Empty description="Note not found." />
         </Content>
@@ -271,308 +383,225 @@ const NoteDetailPage: React.FC = () => {
     );
   }
 
-  if (loading) {
-    return (
-      <PageLayout>
-        <Content style={{ padding: "32px" }}>
-          <Spin size="large" tip="Loading note..." style={{ marginTop: 48 }} />
-        </Content>
-      </PageLayout>
-    );
-  }
-
-
   return (
     <PageLayout>
       <Content style={{ padding: "32px" }}>
         <Space style={{ marginBottom: 24 }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate("/my-notes")}
-            style={{ borderRadius: 8 }}
-          >
-            Back to My Notes
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ borderRadius: 8 }}>
+            Back
           </Button>
+
           {isOwner && (
-            <>
-              <Button
-                type="primary"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/note/${id}/edit`)}
-                style={{
-                  backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
-                  borderColor: isDark ? "#4da3ff" : "#0b5ed7",
-                  borderRadius: 8,
-                }}
-              >
-                Edit Note
-              </Button>
-              <Popconfirm
-                title="Delete this note?"
-                description="This action cannot be undone."
-                okText="Delete"
-                okButtonProps={{ danger: true }}
-                cancelText="Cancel"
-                onConfirm={handleDelete}
-              >
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  style={{ borderRadius: 8 }}
-                >
-                  Delete Note
-                </Button>
-              </Popconfirm>
-            </>
-          )}
-          {isLecturer && note && (
-            <Popconfirm
-              title={note.is_verified === 1 ? "Mark as unverified?" : "Mark as teacher verified?"}
-              description={note.is_verified === 1 ? "This will remove the teacher verified status." : "This will add teacher verified status to this note."}
-              okText="Confirm"
-              cancelText="Cancel"
-              onConfirm={handleToggleVerification}
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/note/${id}/edit`)}
+              style={{
+                backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
+                borderColor: isDark ? "#4da3ff" : "#0b5ed7",
+                borderRadius: 8,
+              }}
             >
-              <Button
-                icon={<SafetyCertificateOutlined />}
-                loading={verificationLoading}
-                type={note.is_verified === 1 ? "default" : "primary"}
-                style={{
-                  borderRadius: 8,
-                  backgroundColor: note.is_verified === 1 ? undefined : (isDark ? "#4da3ff" : "#0b5ed7"),
-                  borderColor: note.is_verified === 1 ? undefined : (isDark ? "#4da3ff" : "#0b5ed7"),
-                }}
-              >
-                {note.is_verified === 1 ? "Teacher Unverify" : "Teacher Verify"}
-              </Button>
-            </Popconfirm>
+              Edit Note
+            </Button>
+          )}
+
+          {isLecturer && (
+            <Button
+              icon={<SafetyCertificateOutlined />}
+              loading={verificationLoading}
+              type={note.verified === 1 ? "default" : "primary"}
+              onClick={handleVerifyToggle}
+              style={{ borderRadius: 8 }}
+            >
+              {note.verified === 1 ? "Teacher Unverify" : "Teacher Verify"}
+            </Button>
           )}
         </Space>
 
-        {note && (
-          <>
-            {/* Title & module */}
-            <Card style={cardStyle}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                <FileTextOutlined style={{ fontSize: 28, color: isDark ? "#4da3ff" : "#0b5ed7" }} />
-                <Title level={2} style={{ margin: 0 }}>
-                  {note.title}
-                </Title>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
-                <Tag color="blue" style={{ borderRadius: 6, fontSize: 13, padding: "2px 10px" }}>
-                  {MODULE_LABELS[note.module] ?? note.module}
-                </Tag>
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  <CalendarOutlined style={{ marginRight: 6 }} />
-                  {new Date(note.created_at).toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </Text>
-              </div>
-            </Card>
+        <Card style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <FileTextOutlined style={{ fontSize: 28, color: isDark ? "#4da3ff" : "#0b5ed7" }} />
+            <Title level={2} style={{ margin: 0 }}>
+              {note.title}
+            </Title>
+          </div>
 
-            {/* Content */}
-            <Card title="Content" style={cardStyle}>
-              {note.note_data ? (
-                <Paragraph style={{ fontSize: 15, margin: 0, whiteSpace: "pre-wrap" }}>
-                  {note.note_data}
-                </Paragraph>
-              ) : (
-                <Text type="secondary">No content provided.</Text>
-              )}
-            </Card>
-
-            {/* Attached File */}
-            {note.file_name && (
-              <Card
-                title={
-                  <span>
-                    <PaperClipOutlined style={{ marginRight: 8 }} />
-                    Attached File
-                  </span>
-                }
-                style={cardStyle}
-              >
-                {/* File metadata section */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <PaperClipOutlined 
-                      style={{ 
-                        fontSize: 24, 
-                        color: isDark ? "#4da3ff" : "#0b5ed7" 
-                      }} 
-                    />
-                    <div>
-                      <Text strong style={{ display: "block" }}>
-                        {note.file_name}
-                      </Text>
-                      <Space style={{ marginTop: 4 }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          {note.file_size ? formatFileSize(note.file_size) : "Unknown size"}
-                        </Text>
-                        {note.file_type && (
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {note.file_type}
-                          </Text>
-                        )}
-                      </Space>
-                    </div>
-                  </div>
-                  <Button
-                    type="primary"
-                    icon={<DownloadOutlined />}
-                    onClick={() => note.file_data && handleDownloadFile(note)}
-                    style={{
-                      backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
-                      borderColor: isDark ? "#4da3ff" : "#0b5ed7",
-                    }}
-                  >
-                    Download
-                  </Button>
-                </div>
-
-                {/* PDF viewer section */}
-                {note.file_type === "application/pdf" && note.file_data && (
-                  <div style={{
-                    marginTop: 16,
-                    border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`,
-                    borderRadius: 6,
-                    overflow: "auto",
-                    minHeight: "100vh"
-                  }}>
-                    <iframe
-                      src={note.file_data}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        minHeight: "100vh",
-                        border: "none"
-                      }}
-                      title={note.file_name}
-                    />
-                  </div>
-                )}
-              </Card>
+          <Space size="middle" wrap>
+            <Tag color="blue" style={{ borderRadius: 6, fontSize: 13, padding: "2px 10px" }}>
+              {MODULE_LABELS[note.module] ?? note.module}
+            </Tag>
+            {note.ownerEmail && (
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                By {note.ownerEmail}
+              </Text>
             )}
+            {note.createdAt && (
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {new Date(note.createdAt).toLocaleDateString()}
+              </Text>
+            )}
+            {note.verified === 1 && (
+              <Tag icon={<CheckCircleOutlined />} color="success">
+                Verified
+              </Tag>
+            )}
+          </Space>
+        </Card>
 
-            {/* Comments Section */}
-            <Card title="Comments" style={cardStyle} loading={commentsLoading}>
-              {/* Comment Form */}
-              <Space direction="vertical" style={{ width: "100%", marginBottom: 24 }}>
-                <Input.TextArea
-                  placeholder="Add a comment..."
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={3}
-                  style={{
-                    backgroundColor: isDark ? "#262626" : "#fafafa",
-                    borderColor: isDark ? "#434343" : "#d9d9d9",
-                    color: isDark ? "#fff" : "#000"
-                  }}
-                />
-                <Button
-                  type="primary"
-                  onClick={handleAddComment}
-                  loading={submittingComment}
-                  style={{
-                    backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
-                    borderColor: isDark ? "#4da3ff" : "#0b5ed7",
-                  }}
-                >
-                  Post Comment
-                </Button>
+        <Card title="Content" style={cardStyle}>
+          {note.content ? (
+            <Paragraph style={{ fontSize: 15, margin: 0, whiteSpace: "pre-wrap" }}>{note.content}</Paragraph>
+          ) : (
+            <Text type="secondary">No content provided.</Text>
+          )}
+        </Card>
+
+        {note.fileName && (
+          <Card
+            title={
+              <Space>
+                <PaperClipOutlined />
+                Attached File
               </Space>
+            }
+            style={cardStyle}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <Space direction="vertical" size={0}>
+                <Text strong>{note.fileName}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {note.fileSize ? formatFileSize(note.fileSize) : "Unknown size"}
+                  {note.fileType ? ` • ${note.fileType}` : ""}
+                </Text>
+              </Space>
+              <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownloadInlineFile}>
+                Download
+              </Button>
+            </div>
 
-              {/* Comments List */}
-              {comments.length > 0 ? (
-                <List
-                  dataSource={comments}
-                  renderItem={(comment) => (
-                    <List.Item style={{ paddingLeft: 0, paddingRight: 0 }}>
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar
-                            src={comment.commenter_profile_picture || undefined}
-                            icon={<UserOutlined />}
-                            style={{
-                              backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
-                            }}
-                          />
-                        }
-                        title={
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span>{comment.commenter_name || comment.commenter_email || "Unknown"}</span>
-                            {comment.is_lecturer && (
-                              <CheckCircleOutlined
-                                style={{
-                                  color: "#52c41a",
-                                  fontSize: 16,
-                                }}
-                                title="Lecturer"
-                              />
-                            )}
-                          </div>
-                        }
-                        description={
-                          <div>
-                            <Text style={{ fontSize: 12, color: isDark ? "#8c8c8c" : "#999" }}>
-                              {new Date(comment.created_at).toLocaleDateString(undefined, {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </Text>
-                            <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
-                              {comment.suggestion_data}
-                            </Paragraph>
-                          </div>
-                        }
-                      />
-                    </List.Item>
-                  )}
-                />
-              ) : (
-                <Empty description="No comments yet. Be the first to comment!" />
-              )}
-            </Card>
-          </>
+            {note.fileType === "application/pdf" && note.fileData && (
+              <div style={{ marginTop: 16, border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`, borderRadius: 6, overflow: "hidden" }}>
+                <iframe src={note.fileData} style={{ width: "100%", minHeight: "70vh", border: "none" }} title={note.fileName} />
+              </div>
+            )}
+          </Card>
         )}
+
+        {noteFiles.length > 0 && (
+          <Card
+            title={
+              <Space>
+                <PaperClipOutlined />
+                {`Attachments (${noteFiles.length})`}
+              </Space>
+            }
+            style={cardStyle}
+          >
+            <List
+              dataSource={noteFiles}
+              renderItem={(file) => (
+                <List.Item
+                  actions={[
+                    <Button key="download" type="link" icon={<DownloadOutlined />} href={`/api/files/${file.id}`} download={file.filename}>
+                      Download
+                    </Button>,
+                  ]}
+                >
+                  <Text>{file.filename}</Text>
+                </List.Item>
+              )}
+            />
+          </Card>
+        )}
+
+        <Card title="Rating" style={cardStyle}>
+          <Space direction="vertical" size={4}>
+            <Space align="center">
+              <Rate
+                allowHalf
+                value={isOwner ? note.ratingAverage : userRating}
+                onChange={isOwner || hasRated ? undefined : handleRate}
+                disabled={isOwner || hasRated}
+              />
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                {note.numberRatings > 0
+                  ? `${note.ratingAverage.toFixed(1)} / 5 • ${note.numberRatings} ${note.numberRatings === 1 ? "rating" : "ratings"}`
+                  : "No ratings yet"}
+              </Text>
+            </Space>
+            {!isOwner && !hasRated && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Click the stars to rate this note
+              </Text>
+            )}
+            {hasRated && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Thanks for rating
+              </Text>
+            )}
+          </Space>
+        </Card>
+
+        <Card title={`Comments (${comments.length})`} style={{ ...cardStyle, marginBottom: 0 }} loading={commentsLoading}>
+          {comments.length > 0 ? (
+            <List
+              dataSource={comments}
+              style={{ marginBottom: 20 }}
+              renderItem={(comment) => {
+                const author = comment.commenter_name || comment.commenter_email || String(comment.commenter_id);
+                return (
+                  <List.Item style={{ alignItems: "flex-start", padding: "12px 0" }}>
+                    <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                      <Space>
+                        <Avatar
+                          size="small"
+                          src={comment.commenter_profile_picture || undefined}
+                          icon={<UserOutlined />}
+                          style={{ backgroundColor: "#0b5ed7" }}
+                        />
+                        <Text strong style={{ fontSize: 13 }}>
+                          {author}
+                        </Text>
+                        {Boolean(comment.is_lecturer) && <CheckCircleOutlined style={{ color: "#52c41a" }} />}
+                      </Space>
+                      <Text style={{ fontSize: 14, paddingLeft: 28 }}>{comment.suggestion_data}</Text>
+                    </Space>
+                  </List.Item>
+                );
+              }}
+            />
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No comments yet. Be the first!" style={{ marginBottom: 20 }} />
+          )}
+
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <Input.TextArea
+              placeholder="Write a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              rows={2}
+              style={{ borderRadius: 8, flex: 1 }}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleAddComment}
+              loading={submittingComment}
+              disabled={!commentText.trim()}
+              style={{
+                backgroundColor: isDark ? "#4da3ff" : "#0b5ed7",
+                borderColor: isDark ? "#4da3ff" : "#0b5ed7",
+                borderRadius: 8,
+              }}
+            >
+              Post
+            </Button>
+          </div>
+        </Card>
       </Content>
     </PageLayout>
   );
-};
-
-const handleDownloadFile = (note: Note) => {
-  try {
-    if (!note.file_data || !note.file_name) {
-      message.error("File data not available");
-      return;
-    }
-    // Convert base64 to blob and download
-    const link = document.createElement('a');
-    link.href = note.file_data;
-    link.download = note.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    message.success(`Downloaded ${note.file_name}`);
-  } catch (error) {
-    console.error("Error downloading file:", error);
-    message.error("Failed to download file");
-  }
-};
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
 
 export default NoteDetailPage;

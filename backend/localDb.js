@@ -30,69 +30,101 @@ const dbReadyPromise = new Promise((resolve, reject) => {
  */
 function initializeLocalDatabase() {
     return new Promise((resolve, reject) => {
-        db.serialize(() => {
-            db.run(`
-                CREATE TABLE IF NOT EXISTS user_data (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE,
-                    is_lecturer INTEGER NOT NULL DEFAULT 0 CHECK (is_lecturer IN (0,1)),
-                    points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
-                    password_hash TEXT NOT NULL,
-                    profile_picture TEXT
-                )
-            `, (err) => {
-                if (err) return reject(err);
-            });
+        let completed = 0;
+        const total = 5; // 4 tables + user_data schema migration check
 
-            db.run(`
-                CREATE TABLE IF NOT EXISTS notes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    owner_id INTEGER NOT NULL,
-                    title TEXT NOT NULL,
-                    is_verified INTEGER NOT NULL DEFAULT 0 CHECK (is_verified IN (0,1)),
-                    note_data TEXT NOT NULL,
-                    module TEXT NOT NULL,
-                    file_name TEXT,
-                    file_type TEXT,
-                    file_size INTEGER DEFAULT 0,
-                    file_data TEXT,
-                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    FOREIGN KEY (owner_id) REFERENCES user_data(id) ON DELETE CASCADE
-                )
-            `, (err) => {
-                if (err) return reject(err);
-            });
-
-            db.run(`
-                CREATE TABLE IF NOT EXISTS suggestions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    note_id INTEGER NOT NULL,
-                    commenter_id INTEGER NOT NULL,
-                    suggestion_data TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
-                    FOREIGN KEY (commenter_id) REFERENCES user_data(id) ON DELETE CASCADE
-                )
-            `, (err) => {
-                if (err) return reject(err);
-            });
-
-            db.run(`
-                CREATE TABLE IF NOT EXISTS note_ratings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    note_id INTEGER NOT NULL,
-                    rater_id INTEGER NOT NULL,
-                    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
-                    UNIQUE(note_id, rater_id),
-                    FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
-                    FOREIGN KEY (rater_id) REFERENCES user_data(id) ON DELETE CASCADE
-                )
-            `, (err) => {
-                if (err) return reject(err);
+        const checkCompletion = () => {
+            completed++;
+            if (completed === total) {
+                console.log("Local database tables initialized");
                 resolve();
-            });
+            }
+        };
+
+        // Create user_data table
+        db.run(`
+            CREATE TABLE IF NOT EXISTS user_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                is_lecturer INTEGER NOT NULL DEFAULT 0 CHECK (is_lecturer IN (0,1)),
+                points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
+                password_hash TEXT NOT NULL,
+                profile_picture TEXT
+            )
+        `, (err) => {
+            if (err) {
+                console.error("Error creating user_data table:", err.message);
+                reject(err);
+            } else {
+                checkCompletion();
+            }
+        });
+
+        // Create notes table
+        db.run(`
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                is_verified INTEGER NOT NULL DEFAULT 0 CHECK (is_verified IN (0,1)),
+                note_data TEXT NOT NULL,
+                module TEXT NOT NULL,
+                file_name TEXT,
+                file_type TEXT,
+                file_size INTEGER DEFAULT 0,
+                file_data TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (owner_id) REFERENCES user_data(id) ON DELETE CASCADE
+            )
+        `, (err) => {
+            if (err) {
+                console.error("Error creating notes table:", err.message);
+                reject(err);
+            } else {
+                checkCompletion();
+            }
+        });
+
+        // Create suggestions table
+        db.run(`
+            CREATE TABLE IF NOT EXISTS suggestions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                note_id INTEGER NOT NULL,
+                commenter_id INTEGER NOT NULL,
+                suggestion_data TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                FOREIGN KEY (commenter_id) REFERENCES user_data(id) ON DELETE CASCADE
+            )
+        `, (err) => {
+            if (err) {
+                console.error("Error creating suggestions table:", err.message);
+                reject(err);
+            } else {
+                checkCompletion();
+            }
+        });
+
+        // Create note_ratings table
+        db.run(`
+            CREATE TABLE IF NOT EXISTS note_ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                note_id INTEGER NOT NULL,
+                rater_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                UNIQUE(note_id, rater_id),
+                FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+                FOREIGN KEY (rater_id) REFERENCES user_data(id) ON DELETE CASCADE
+            )
+        `, (err) => {
+            if (err) {
+                console.error("Error creating note_ratings table:", err.message);
+                reject(err);
+            } else {
+                checkCompletion();
+            }
         });
     });
 }

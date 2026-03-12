@@ -21,49 +21,14 @@ import {
   CheckCircleOutlined,
   SunOutlined,
   MoonOutlined,
-  BookOutlined,
 } from "@ant-design/icons";
 import { useTheme } from "../components/ThemeContext";
+import type { Rule } from "antd/es/form";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
-const BATH_MAJORS = [
-  // Faculty of Engineering & Design
-  { value: "Architecture", label: "Architecture" },
-  { value: "Chemical Engineering", label: "Chemical Engineering" },
-  { value: "Civil Engineering", label: "Civil Engineering" },
-  { value: "Computer Science", label: "Computer Science" },
-  { value: "Electronic & Electrical Engineering", label: "Electronic & Electrical Engineering" },
-  { value: "Integrated Mechanical & Electrical Engineering", label: "Integrated Mechanical & Electrical Engineering" },
-  { value: "Mechanical Engineering", label: "Mechanical Engineering" },
-  { value: "Product Design & Management", label: "Product Design & Management" },
-  // Faculty of Humanities & Social Sciences
-  { value: "Economics", label: "Economics" },
-  { value: "Education", label: "Education" },
-  { value: "Modern Languages & European Studies", label: "Modern Languages & European Studies" },
-  { value: "Politics, Languages & International Studies", label: "Politics, Languages & International Studies" },
-  { value: "Psychology", label: "Psychology" },
-  { value: "Social Policy", label: "Social Policy" },
-  { value: "Sociology", label: "Sociology" },
-  // Faculty of Science
-  { value: "Biochemistry", label: "Biochemistry" },
-  { value: "Biology", label: "Biology" },
-  { value: "Chemistry", label: "Chemistry" },
-  { value: "Mathematics", label: "Mathematics" },
-  { value: "Natural Sciences", label: "Natural Sciences" },
-  { value: "Pharmacy & Pharmacology", label: "Pharmacy & Pharmacology" },
-  { value: "Physics", label: "Physics" },
-  { value: "Statistics", label: "Statistics" },
-  // School of Management
-  { value: "Accounting & Finance", label: "Accounting & Finance" },
-  { value: "Business Administration", label: "Business Administration" },
-  { value: "Management", label: "Management" },
-  // Other
-  { value: "Sports & Exercise Science", label: "Sports & Exercise Science" },
-  { value: "Nursing", label: "Nursing" },
-];
-const RegistrationRules = {
+const RegistrationRules: Record<string, Rule[]> = {
   name: [
     { required: true, message: "Please enter your name." },
     { min: 2, message: "Name should be at least 2 characters." },
@@ -98,7 +63,6 @@ const RegistrationRules = {
 interface RegisterFormValues {
   name: string;
   email: string;
-  major: string;
   password: string;
   confirmPassword: string;
   is_lecturer?: boolean;
@@ -109,34 +73,36 @@ const Register: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { isDark, toggleTheme } = useTheme();
 
+  const [loading, setLoading] = useState(false);
+
   const onFinish = async (values: RegisterFormValues) => {
     const { name, email, password, is_lecturer } = values;
+    setLoading(true);
 
     const request = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        is_lecturer: Boolean(is_lecturer),
-      }),
+      body: JSON.stringify({ name, email, password, is_lecturer }),
     });
 
-    const data = await request.json();
+      const data = await request.json();
 
-    // Failure
-    if (!request.ok) {
-      const errorMessages = data.errors ? data.errors.join(",\n") : "Unknown error.";
-      message.error(`Failed to create account: ${errorMessages}`);
-      return;
+      // Failure
+      if (!request.ok) {
+        const errorMessages = data.errors ? data.errors.join(",\n") : "Unknown error.";
+        message.error(`Failed to create account: ${errorMessages}`);
+        setLoading(false);
+        return;
+      }
+
+      message.success("Account created!");
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    } catch {
+      message.error("A network error occurred. Please try again.");
+      setLoading(false);
     }
-
-    // Success
-    message.success("Account created!");
-    setTimeout(() => {
-      navigate("/login");
-    }, 2000);
   };
 
   const onFinishFailed = () => {
@@ -189,13 +155,15 @@ const Register: React.FC = () => {
                       "linear-gradient(145deg, #0b5ed7 0%, #1d74f5 40%, #3a8bff 100%)",
                     color: "#fff",
                   }}
-                  bodyStyle={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100%",
-                    padding: "32px",
+                  styles={{
+                    body: {
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: "100%",
+                      padding: "32px",
+                    },
                   }}
                 >
                   <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
@@ -217,7 +185,7 @@ const Register: React.FC = () => {
                     boxShadow: "0 18px 40px rgba(15, 35, 95, 0.18)",
                     backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
+                  styles={{ body: { padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" } }}
                 >
                   <Space
                     direction="vertical"
@@ -274,21 +242,6 @@ const Register: React.FC = () => {
                     </Form.Item>
 
                     <Form.Item
-                      label="Major"
-                      name="major"
-                      rules={[{ required: true, message: "Please select your major." }]}
-                    >
-                      <Select
-                        placeholder="Select your major"
-                        size="large"
-                        showSearch
-                        optionFilterProp="label"
-                        suffixIcon={<BookOutlined />}
-                        options={BATH_MAJORS}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
                       label="Password"
                       name="password"
                       rules={RegistrationRules.password}
@@ -335,6 +288,7 @@ const Register: React.FC = () => {
                         htmlType="submit"
                         size="large"
                         icon={<CheckCircleOutlined />}
+                        loading={loading}
                         block
                         style={{
                           backgroundColor: "#0b5ed7",
@@ -342,7 +296,7 @@ const Register: React.FC = () => {
                           borderRadius: 8,
                         }}
                       >
-                        Create account
+                        {loading ? "Creating account..." : "Create account"}
                       </Button>
                     </Form.Item>
                   </Form>

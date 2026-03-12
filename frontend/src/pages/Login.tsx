@@ -16,7 +16,7 @@ import type { Rule } from "antd/es/form";
 import {
   UserOutlined,
   LockOutlined,
-  LoginOutlined,  
+  LoginOutlined,
   SunOutlined,
   MoonOutlined,
 } from "@ant-design/icons";
@@ -28,15 +28,19 @@ const { Content } = Layout;
 const LoginRules: Record<string, Rule[]> = {
   email: [
       { required: true, message: "Please enter your email." },
-      { type: "email", message: "Please enter a valid email address (e.g., user@bath.ac.uk)." },
-      { pattern: /^[a-zA-Z0-9]+@bath\.ac\.uk$/, message: ""},
+      {
+        validator: (_, value) => {
+          if (!value) return Promise.resolve();
+          if (value === "admin") return Promise.resolve();
+          if (/^[a-zA-Z0-9.]+@bath\.ac\.uk$/.test(value)) return Promise.resolve();
+          return Promise.reject("Please enter a valid Bath email (e.g., user@bath.ac.uk).");
+        },
+      },
   ],
   
   password: [
     { required: true, message: "Please enter your password." },
-
   ],
-  
 };
 
 interface LoginFormValues {
@@ -44,9 +48,11 @@ interface LoginFormValues {
   password: string;
 }
 
+interface LoginProps {
+  setIsAuthenticated: (value: boolean) => void;
+}
 
-
-const Login = ({ setIsAuthenticated }) => {
+const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
@@ -54,31 +60,40 @@ const Login = ({ setIsAuthenticated }) => {
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
 
-    const request = await fetch("/api/login", {
-      method: "POST",
-      headers: {"Content-Type": "application/json",},
-      credentials: "include",
-      body: JSON.stringify(values)
-    })
+    try {
+      const request = await fetch("/api/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json",},
+        credentials: "include",
+        body: JSON.stringify({ email: values.email, password: values.password }),
+      });
 
-    const data = await request.json();
+      const data = await request.json();
 
-    if (!data.ok) {
-      message.error(data.message || "Login failed. Please try again.");
+      if (!data.ok) {
+        message.error(data.message || "Login failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      if (setIsAuthenticated) {
+        setIsAuthenticated(true);
+      }
+
+      message.success("Logged in successfully");
       setLoading(false);
-      return;
+      const isTeacher = data.user?.role === "teacher";
+      setTimeout(() => {
+        navigate(isTeacher ? "/teacher-dashboard" : "/dashboard");
+      }, 1000);
+    } catch {
+      message.error("A network error occurred. Please try again.");
+      setLoading(false);
     }
-
-    // Set authentication state if callback provided
-    if (setIsAuthenticated) {
-      setIsAuthenticated(true);
-    }
-
-    message.success("Logged in successfully");
-    setLoading(false);
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1000);
   };
 
   const onFinishFailed = () => {

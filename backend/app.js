@@ -16,10 +16,12 @@ const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/userRoutes");
 const notesRoutes = require("./routes/notesRoutes");
 const suggestionRoutes = require("./routes/suggestionRoutes");
+const fileRoutes = require("./routes/fileRoutes");
 
 app.use("/api", authRoutes);
 app.use("/api", userRoutes);
 app.use("/api", notesRoutes);
 app.use("/api", suggestionRoutes);
+app.use("/api", fileRoutes);
 
 module.exports = app;

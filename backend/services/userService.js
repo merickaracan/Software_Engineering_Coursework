@@ -24,11 +24,11 @@ const getUser = async (email) => {
  * @returns {Promise<Object>} Insert result with insertId
  * @throws {Error} If the database query fails
  */
-const createUser = async (email, passkey, lecturer = 0, points = 0) => {
+const createUser = async (email, passkey, name = '', lecturer = 0, points = 0) => {
     try {
         const [result] = await db.query(
-            "INSERT INTO user_data (email, passkey, lecturer, points) VALUES (?, ?, ?, ?)",
-            [email, passkey, lecturer, points]
+            "INSERT INTO user_data (email, passkey, name, lecturer, points) VALUES (?, ?, ?, ?, ?)",
+            [email, passkey, name, lecturer, points]
         );
         return result;
     } catch (err) {

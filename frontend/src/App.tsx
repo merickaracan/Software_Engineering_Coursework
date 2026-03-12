@@ -13,6 +13,8 @@ import ModulesPage from './pages/ModulesPage';
 import CreateNotePage from './pages/CreateNotePage';
 import NoteDetailPage from './pages/NoteDetailPage';
 import EditNotePage from './pages/EditNotePage';
+import ModuleNotesPage from './pages/ModuleNotesPage';
+import TeacherDashboard from './pages/TeacherDashboard';
 
 function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -53,6 +55,7 @@ function AppContent() {
         <Route path="/register" element={<Register />} />
         {isAuthenticated ? (
           <>
+            <Route path="/teacher-dashboard" element={<TeacherDashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -61,9 +64,11 @@ function AppContent() {
             <Route path="/create-note" element={<CreateNotePage />} />
             <Route path="/note/:id" element={<NoteDetailPage />} />
             <Route path="/note/:id/edit" element={<EditNotePage />} />
+            <Route path="/modules/:moduleCode" element={<ModuleNotesPage />} />
           </>
         ) : (
           <>
+            <Route path="/teacher-dashboard" element={<Navigate to="/login" />} />
             <Route path="/dashboard" element={<Navigate to="/login" />} />
             <Route path="/profile" element={<Navigate to="/login" />} />
             <Route path="/leaderboard" element={<Navigate to="/login" />} />
@@ -72,6 +77,7 @@ function AppContent() {
             <Route path="/create-note" element={<Navigate to="/login" />} />
             <Route path="/note/:id" element={<Navigate to="/login" />} />
             <Route path="/note/:id/edit" element={<Navigate to="/login" />} />
+            <Route path="/modules/:moduleCode" element={<Navigate to="/login" />} />
           </>
         )}
       </Routes>

@@ -19,22 +19,13 @@ const { Title, Text } = Typography;
 const { Header, Content } = Layout;
 
 interface Note {
-  id: string;
-  title: string;
-  description: string;
+  id: number;
+  email: string;
+  note_title: string;
+  note_data: string;
   module: string;
-  files: string[];
-  createdAt: string;
+  verified: number;
 }
-
-const MODULE_LABELS: Record<string, string> = {
-  se: "Software Engineering",
-  ml: "Machine Learning",
-  sa: "Systems Architecture",
-  vc: "Visual Computing",
-  db: "Databases",
-  ai: "Artificial Intelligence",
-};
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -42,9 +33,22 @@ const Dashboard: React.FC = () => {
   const [recentNotes, setRecentNotes] = useState<Note[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("myNotes");
-    const notes: Note[] = stored ? JSON.parse(stored) : [];
-    setRecentNotes(notes.slice(-3).reverse());
+    // Clear stale localStorage notes from the old local-only implementation
+    localStorage.removeItem("myNotes");
+
+    const stored = localStorage.getItem("user");
+    const user = stored ? JSON.parse(stored) : null;
+    if (!user?.email) return;
+
+    fetch(`/api/notes/email/${encodeURIComponent(user.email)}`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data: { data?: Note[] }) => {
+        const notes = data?.data ?? [];
+        setRecentNotes(notes.slice(-3).reverse());
+      })
+      .catch(() => setRecentNotes([]));
   }, []);
 
   return (
@@ -74,7 +78,7 @@ const Dashboard: React.FC = () => {
         {/* Main content */}
         <Content style={{ padding: "32px" }}>
           {/* Leaderboard section */}
-          <Leaderboard onTitleClick={() => navigate("/leaderboard")} />
+          <Leaderboard onTitleClick={() => navigate("/leaderboard")} limit={5} />
 
           {/* My Notes section */}
           <section style={{ marginBottom: 48 }}>
@@ -106,16 +110,16 @@ const Dashboard: React.FC = () => {
                       }}
                     >
                       <Title level={5} style={{ marginBottom: 6 }}>
-                        {note.title}
+                        {note.note_title || "Untitled Note"}
                       </Title>
                       <Tag color="blue" style={{ borderRadius: 6, marginBottom: 8 }}>
-                        {MODULE_LABELS[note.module] ?? note.module}
+                        {note.module}
                       </Tag>
                       <Text type="secondary" style={{ fontSize: 13, display: "block" }}>
-                        {note.description
-                          ? note.description.length > 80
-                            ? note.description.slice(0, 80) + "…"
-                            : note.description
+                        {note.note_data
+                          ? note.note_data.length > 80
+                            ? note.note_data.slice(0, 80) + "…"
+                            : note.note_data
                           : "No description."}
                       </Text>
                     </Card>

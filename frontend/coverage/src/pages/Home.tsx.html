@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/34</span>
+                <span class='fraction'>17/34</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -295,7 +295,8 @@
 <a name='L230'></a><a href='#L230'>230</a>
 <a name='L231'></a><a href='#L231'>231</a>
 <a name='L232'></a><a href='#L232'>232</a>
-<a name='L233'></a><a href='#L233'>233</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -317,10 +318,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -338,10 +339,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -351,7 +352,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -467,7 +468,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -549,10 +551,10 @@ import {
 } from "@ant-design/icons";
 import { useTheme } from "../components/ThemeContext";
 &nbsp;
-const { Title, Text, Paragraph } = <span class="cstat-no" title="statement not covered" >Typography;</span>
-const { Header, Content, Footer } = <span class="cstat-no" title="statement not covered" >Layout;</span>
+const { Title, Text, Paragraph } = Typography;
+const { Header, Content, Footer } = Layout;
 &nbsp;
-const FEATURES = <span class="cstat-no" title="statement not covered" >[</span>
+const FEATURES = [
   {
     icon: &lt;FileTextOutlined style={{ fontSize: 32 }} /&gt;,
     title: "Create &amp; Share Notes",
@@ -570,37 +572,37 @@ const FEATURES = <span class="cstat-no" title="statement not covered" >[</span>
   },
 ];
 &nbsp;
-const Home: React.FC = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =&gt; {</span></span>
-  const { isDark, toggleTheme <span class="cstat-no" title="statement not covered" >} = useTheme();</span>
+const Home: React.FC = () =&gt; {
+  const { isDark, toggleTheme } = useTheme();
 &nbsp;
-  const cardStyle: React.CSSProperties = <span class="cstat-no" title="statement not covered" >{</span>
+  const cardStyle: React.CSSProperties = {
     borderRadius: 12,
-    boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.3)" : "0 4px 12px rgba(15,35,95,0.08)",
-    border: isDark ? "1px solid #303030" : undefined,
-    background: isDark ? "#1f1f1f" : "#fff",
+    boxShadow: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"0 4px 12px rgba(0,0,0,0.3)" : "</span>0 4px 12px rgba(15,35,95,0.08)",
+    border: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"1px solid #303030" : u</span>ndefined,
+    background: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#1f1f1f" : "</span>#fff",
     textAlign: "center",
     padding: "8px 0",
     height: "100%",
   };
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;Layout
       style={{
         minHeight: "100vh",
         background: isDark
-          ? "linear-gradient(135deg, #0a1628 0%, #141414 60%)"
+          ? <span class="branch-0 cbranch-no" title="branch not covered" >"linear-gradient(135deg, #0a1628 0%, #141414 60%)"</span>
           : "linear-gradient(135deg, #0b5ed7 0%, #e9f2ff 60%)",
       }}
     &gt;
       {/* Nav */}
       &lt;Header
         style={{
-          background: isDark ? "#1a3a6e" : "#0b5ed7",
+          background: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#1a3a6e" : "</span>#0b5ed7",
           display: "flex",
           alignItems: "center",
           padding: "0 32px",
           height: 80,
-          boxShadow: isDark ? "0 2px 12px rgba(0,0,0,0.4)" : "0 2px 8px rgba(0,0,0,0.08)",
+          boxShadow: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"0 2px 12px rgba(0,0,0,0.4)" : "</span>0 2px 8px rgba(0,0,0,0.08)",
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -613,9 +615,10 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
         &lt;div style={{ display: "flex", alignItems: "center", gap: 12 }}&gt;
           &lt;div
             onClick={toggleTheme}
+            data-testid="home-theme-toggle"
             style={{ cursor: "pointer", fontSize: 20, color: "#fff", marginRight: 4 }}
           &gt;
-            {isDark ? &lt;SunOutlined /&gt; : &lt;MoonOutlined /&gt;}
+            {isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >&lt;SunOutlined /&gt; : &lt;</span>MoonOutlined /&gt;}
           &lt;/div&gt;
           &lt;Link to="/login"&gt;
             &lt;Button
@@ -636,9 +639,9 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
               icon={&lt;UserAddOutlined /&gt;}
               style={{
                 borderRadius: 8,
-                backgroundColor: isDark ? "#4da3ff" : "#fff",
-                borderColor: isDark ? "#4da3ff" : "#fff",
-                color: isDark ? "#fff" : "#0b5ed7",
+                backgroundColor: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#4da3ff" : "</span>#fff",
+                borderColor: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#4da3ff" : "</span>#fff",
+                color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#fff" : "</span>#0b5ed7",
                 fontWeight: 600,
               }}
             &gt;
@@ -680,9 +683,9 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
                 type="primary"
                 size="large"
                 style={{
-                  backgroundColor: isDark ? "#4da3ff" : "#fff",
-                  borderColor: isDark ? "#4da3ff" : "#fff",
-                  color: isDark ? "#fff" : "#0b5ed7",
+                  backgroundColor: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#4da3ff" : "</span>#fff",
+                  borderColor: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#4da3ff" : "</span>#fff",
+                  color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#fff" : "</span>#0b5ed7",
                   borderRadius: 8,
                   height: 48,
                   fontWeight: 600,
@@ -698,13 +701,13 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
 &nbsp;
         {/* Features */}
         &lt;Row gutter={[24, 24]} align="stretch" style={{ marginBottom: 72 }}&gt;
-          {FEATURES.map(<span class="fstat-no" title="function not covered" >(f</span>) =&gt; (
-<span class="cstat-no" title="statement not covered" >            &lt;Col xs={24} md={8} key={f.title}&gt;</span>
+          {FEATURES.map((f) =&gt; (
+            &lt;Col xs={24} md={8} key={f.title}&gt;
               &lt;Card style={cardStyle}&gt;
-                &lt;div style={{ color: isDark ? "#4da3ff" : "#0b5ed7", marginBottom: 16 }}&gt;
+                &lt;div style={{ color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#4da3ff" : "</span>#0b5ed7", marginBottom: 16 }}&gt;
                   {f.icon}
                 &lt;/div&gt;
-                &lt;Title level={4} style={{ marginBottom: 8, color: isDark ? "#fff" : undefined }}&gt;
+                &lt;Title level={4} style={{ marginBottom: 8, color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#fff" : u</span>ndefined }}&gt;
                   {f.title}
                 &lt;/Title&gt;
                 &lt;Text type="secondary" style={{ fontSize: 14 }}&gt;
@@ -717,7 +720,7 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
 &nbsp;
         {/* How it works */}
         &lt;Card style={{ ...cardStyle, textAlign: "left", padding: "32px" }}&gt;
-          &lt;Title level={3} style={{ marginBottom: 32, color: isDark ? "#fff" : undefined }}&gt;
+          &lt;Title level={3} style={{ marginBottom: 32, color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#fff" : u</span>ndefined }}&gt;
             How It Works
           &lt;/Title&gt;
           &lt;Steps
@@ -747,7 +750,7 @@ const Home: React.FC = <span class="cstat-no" title="statement not covered" ><sp
       &lt;Footer
         style={{
           textAlign: "center",
-          color: isDark ? "#666" : "#a0b4d6",
+          color: isDark ? <span class="branch-0 cbranch-no" title="branch not covered" >"#666" : "</span>#a0b4d6",
           background: "transparent",
           paddingBottom: 32,
         }}
@@ -766,7 +769,7 @@ export default Home;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-12T18:52:04.200Z
+                at 2026-03-14T16:26:21.453Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

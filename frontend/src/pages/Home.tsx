@@ -84,6 +84,7 @@ const Home: React.FC = () => {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div
             onClick={toggleTheme}
+            data-testid="home-theme-toggle"
             style={{ cursor: "pointer", fontSize: 20, color: "#fff", marginRight: 4 }}
           >
             {isDark ? <SunOutlined /> : <MoonOutlined />}

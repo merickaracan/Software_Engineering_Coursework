@@ -1,13 +1,24 @@
 const request = require("supertest");
+const bcrypt = require("bcrypt");
 const app = require("../app");
 
-// Helper to generate unique Bath email addresses for testing, avoids "Duplicate email" errors
+jest.mock("../services/userService");
+
 const makeEmail = (label = "user") =>
   `test.${label}.${Date.now()}.${Math.floor(Math.random() * 10000)}@bath.ac.uk`;
 
 describe("Registration tests:", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   test("Register new user (valid)", async () => {
+    const { getUser, createUser } = require("../services/userService");
     const email = makeEmail("valid");
+
+    getUser.mockResolvedValueOnce(null);
+    createUser.mockResolvedValueOnce({ insertId: 1 });
+
     const res = await request(app)
       .post("/api/register")
       .send({
@@ -18,6 +29,10 @@ describe("Registration tests:", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.ok).toBe(true);
+    expect(res.body.message).toBe("Account created successfully");
+    expect(createUser).toHaveBeenCalledWith(email, expect.any(String), "Test User", 0);
+    expect(createUser.mock.calls[0][1]).not.toBe("Password123!");
+    expect(await bcrypt.compare("Password123!", createUser.mock.calls[0][1])).toBe(true);
   });
 
   test("Rejects missing name", async () => {
@@ -67,14 +82,10 @@ describe("Registration tests:", () => {
   });
 
   test("Rejects duplicate email", async () => {
+    const { getUser } = require("../services/userService");
     const email = makeEmail("dupe");
-    await request(app)
-      .post("/api/register")
-      .send({
-        name: "Test User",
-        email,
-        password: "Password123!",
-      });
+
+    getUser.mockResolvedValueOnce({ email, name: "Test User" });
 
     const res = await request(app)
       .post("/api/register")

@@ -12,6 +12,9 @@ import {
   Tag,
   Rate,
   Empty,
+  Space,
+  Upload,
+  message,
   Spin,
 } from "antd";
 import {
@@ -25,6 +28,8 @@ import {
 } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
+import { logout } from "../api/auth";
+import { getUser, updateProfilePicture } from "../api/users";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -62,6 +67,27 @@ const rankLabel = (rank: number) => {
 const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+
+  const handleLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await logout();
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      // Still clear local storage even if logout fails
+      localStorage.removeItem("user");
+      message.success("Logged out successfully");
+      navigate("/login");
+    } finally {
+      setLogoutLoading(false);
+    }
+  };
 
   const stored = localStorage.getItem("user");
   const user = stored ? JSON.parse(stored) : null;
@@ -75,28 +101,140 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!email) return;
-    Promise.all([
-      fetch(`/api/notes/email/${encodeURIComponent(email)}`, { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/notes/leaderboard", { credentials: "include" }).then((r) => r.json()),
-    ])
-      .then(([notesData, lbData]) => {
+    let isMounted = true;
+    const hasValidEmail = Boolean(email) && email !== "No email set";
+
+    if (!hasValidEmail) {
+      setLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const fetchProfileAndStats = async () => {
+      setLoading(true);
+
+      try {
+        const [profileResponse, notesData, lbData] = await Promise.all([
+          getUser(email),
+          fetch(`/api/notes/email/${encodeURIComponent(email)}`, { credentials: "include" }).then((r) => r.json()),
+          fetch("/api/notes/leaderboard", { credentials: "include" }).then((r) => r.json()),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (profileResponse?.ok && Array.isArray(profileResponse.data) && profileResponse.data.length > 0) {
+          setProfilePicture(profileResponse.data[0].profile_picture || null);
+        } else {
+          setProfilePicture(null);
+        }
+
         const userNotes: Note[] = notesData?.data ?? [];
         setNotes(userNotes);
 
         const board: LeaderboardEntry[] = lbData?.data ?? [];
         const sorted = [...board].sort((a, b) => Number(b.avgRating) - Number(a.avgRating));
-        const pos = sorted.findIndex((e) => e.email === email);
+        const pos = sorted.findIndex((entry) => entry.email === email);
+
         if (pos !== -1) {
           setRank(pos + 1);
           setTotalNotes(sorted[pos].totalNotes);
           setAvgRating(Number(sorted[pos].avgRating));
         } else {
+          setRank(null);
           setTotalNotes(userNotes.length);
+          setAvgRating(0);
         }
-      })
-      .finally(() => setLoading(false));
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error fetching profile data:", error);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchProfileAndStats();
+
+    return () => {
+      isMounted = false;
+    };
   }, [email]);
+
+  const convertFileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadProfilePicture = async (file: File) => {
+    if (!email || email === "No email set") {
+      message.error("Unable to identify user");
+      return false;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      message.error("Please select an image file");
+      return false;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      message.error("Image must be smaller than 2MB");
+      return false;
+    }
+
+    try {
+      setUploadingPicture(true);
+      const dataUrl = await convertFileToDataUrl(file);
+      const response = await updateProfilePicture(email, dataUrl);
+
+      if (!response.ok) {
+        message.error(response.error || "Failed to update profile picture");
+        return false;
+      }
+
+      setProfilePicture(dataUrl);
+      message.success("Profile picture updated");
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      message.error("Failed to update profile picture");
+    } finally {
+      setUploadingPicture(false);
+    }
+
+    return false;
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    if (!email || email === "No email set") {
+      message.error("Unable to identify user");
+      return;
+    }
+
+    try {
+      setUploadingPicture(true);
+      const response = await updateProfilePicture(email, null);
+      if (!response.ok) {
+        message.error(response.error || "Failed to remove profile picture");
+        return;
+      }
+
+      setProfilePicture(null);
+      message.success("Profile picture removed");
+    } catch (error) {
+      console.error("Error removing profile picture:", error);
+      message.error("Failed to remove profile picture");
+    } finally {
+      setUploadingPicture(false);
+    }
+  };
 
   const cardStyle: React.CSSProperties = {
     borderRadius: 12,
@@ -118,18 +256,33 @@ const Profile: React.FC = () => {
             {/* Profile header card */}
             <Card
               style={cardStyle}
-              bodyStyle={{
+              styles={{ body: {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 padding: "32px",
-              }}
+              }}}
             >
               <Avatar
                 size={96}
+                src={profilePicture || undefined}
                 icon={<UserOutlined />}
                 style={{ backgroundColor: "#0b5ed7", marginBottom: 16 }}
               />
+              <Space style={{ marginBottom: 12 }}>
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={handleUploadProfilePicture}
+                >
+                  <Button loading={uploadingPicture}>Change profile picture</Button>
+                </Upload>
+                {profilePicture && (
+                  <Button danger onClick={handleRemoveProfilePicture} loading={uploadingPicture}>
+                    Remove
+                  </Button>
+                )}
+              </Space>
               <Title level={3} style={{ margin: 0 }}>
                 {name}
               </Title>
@@ -268,7 +421,7 @@ const Profile: React.FC = () => {
                           border: isDark ? "1px solid #303030" : "1px solid #e6eeff",
                           cursor: "pointer",
                         }}
-                        bodyStyle={{ padding: "16px 20px" }}
+                        styles={{ body: { padding: "16px 20px" } }}
                       >
                         <Row align="middle" justify="space-between" wrap>
                           <Col flex="auto">
@@ -345,10 +498,8 @@ const Profile: React.FC = () => {
                     size="large"
                     icon={<LogoutOutlined />}
                     style={{ borderRadius: 8 }}
-                    onClick={() => {
-                      localStorage.removeItem("user");
-                      navigate("/login");
-                    }}
+                    loading={logoutLoading}
+                    onClick={handleLogout}
                   >
                     Log out
                   </Button>

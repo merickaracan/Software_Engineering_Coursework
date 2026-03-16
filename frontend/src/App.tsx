@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import LeaderboardPage from './pages/LeaderboardPage';
 import MyNotesPage from './pages/MyNotesPage';
+import SearchNotesPage from './pages/SearchNotesPage';
 import ModulesPage from './pages/ModulesPage';
 import CreateNotePage from './pages/CreateNotePage';
 import NoteDetailPage from './pages/NoteDetailPage';
@@ -60,6 +61,7 @@ function AppContent() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/my-notes" element={<MyNotesPage />} />
+            <Route path="/search-notes" element={<SearchNotesPage />} />
             <Route path="/modules" element={<ModulesPage />} />
             <Route path="/create-note" element={<CreateNotePage />} />
             <Route path="/note/:id" element={<NoteDetailPage />} />
@@ -73,6 +75,7 @@ function AppContent() {
             <Route path="/profile" element={<Navigate to="/login" />} />
             <Route path="/leaderboard" element={<Navigate to="/login" />} />
             <Route path="/my-notes" element={<Navigate to="/login" />} />
+            <Route path="/search-notes" element={<Navigate to="/login" />} />
             <Route path="/modules" element={<Navigate to="/login" />} />
             <Route path="/create-note" element={<Navigate to="/login" />} />
             <Route path="/note/:id" element={<Navigate to="/login" />} />

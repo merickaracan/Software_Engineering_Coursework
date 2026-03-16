@@ -135,7 +135,7 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
               {/* Left panel – info / branding (hidden on very small screens) */}
               <Col xs={0} md={12}>
                 <Card
-                  bordered={false}
+                  variant="borderless"
                   style={{
                     height: "100%",
                     minHeight: 500,
@@ -143,14 +143,14 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
                       "linear-gradient(145deg, #0b5ed7 0%, #1d74f5 40%, #3a8bff 100%)",
                     color: "#fff",
                   }}
-                  bodyStyle={{
+                  styles={{ body: {
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "center",
                     alignItems: "center",
                     height: "100%",
                     padding: "32px",
-                  }}
+                  }}}
                 >
                   <Title level={2} style={{ color: "#fff", marginBottom: 16, textAlign: "center" }}>
                     Welcome to Notebuddy
@@ -161,7 +161,7 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
                   </Text>
 
                   <Space
-                    direction="vertical"
+                    orientation="vertical"
                     size="small"
                     style={{ marginTop: 24, fontSize: 13, color: "#e4edff" }}
                   >
@@ -172,7 +172,7 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
               {/* Right panel – login form */}
               <Col xs={24} md={12}>
                 <Card
-                  bordered={false}
+                  variant="borderless"
                   style={{
                     borderRadius: 16,
                     minHeight: 500,
@@ -180,10 +180,10 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
                       "0 18px 40px rgba(15, 35, 95, 0.18)",
                     backgroundColor: isDark ? "#1f1f1f" : "#ffffff",
                   }}
-                  bodyStyle={{ padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}
+                  styles={{ body: { padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" } }}
                 >
                   <Space
-                    direction="vertical"
+                    orientation="vertical"
                     size="small"
                     style={{ width: "100%", marginBottom: 24 }}
                   >

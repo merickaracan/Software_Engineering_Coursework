@@ -3,12 +3,12 @@
  * @param {string} email - User's email address
  * @param {string} name - User's full name
  * @param {string} passwordHash - User's hashed password
- * @param {number} [isLecturer=0] - Whether user is a lecturer (0 or 1)
+ * @param {number} [lecturer=0] - Whether user is a lecturer (0 or 1)
  * @param {number} [points=0] - User's initial points
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const createUser = async (email, name, passwordHash, isLecturer=0, points=0) => {
+const createUser = async (email, name, passwordHash, lecturer=0, points=0) => {
     try {
         const response = await fetch("/api/users", {
             method: "POST",
@@ -19,7 +19,7 @@ const createUser = async (email, name, passwordHash, isLecturer=0, points=0) => 
                 email: email,
                 name: name,
                 password_hash: passwordHash,
-                is_lecturer: isLecturer,
+                lecturer: lecturer,
                 points: points
             })
         });
@@ -58,12 +58,12 @@ const getUser = async (email) => {
  * @param {string} email - User's email address (used as identifier)
  * @param {string|null} [name=null] - User's full name (optional)
  * @param {string|null} [passwordHash=null] - New hashed password (optional)
- * @param {number|null} [isLecturer=null] - New lecturer status (optional)
+ * @param {number|null} [lecturer=null] - New lecturer status (optional)
  * @param {number|null} [points=null] - New points value (optional)
  * @returns {Promise<Object>} Response data from server
  * @throws {Error} If the request fails
  */
-const updateUser = async (email, name=null, passwordHash=null, isLecturer=null, points=null) => {
+const updateUser = async (email, name=null, passwordHash=null, lecturer=null, points=null) => {
     try{
         const response = await fetch(`/api/users/${email}`, {
             method: "PUT",
@@ -73,7 +73,7 @@ const updateUser = async (email, name=null, passwordHash=null, isLecturer=null, 
             body: JSON.stringify({
                 name: name,
                 password_hash: passwordHash,
-                is_lecturer: isLecturer,
+                lecturer: lecturer,
                 points: points
             }),
             credentials: "include",

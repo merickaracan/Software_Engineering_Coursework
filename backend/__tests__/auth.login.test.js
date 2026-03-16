@@ -1,104 +1,125 @@
 const request = require("supertest");
 const app = require("../app");
+const bcrypt = require("bcrypt");
+
+jest.mock("../services/userService");
 
 const makeEmail = (label = "user") =>
-	`login.${label}.${Date.now()}.${Math.floor(Math.random() * 10000)}@bath.ac.uk`;
-
-async function registerUser(email, password = "Password123!") {
-	return request(app).post("/api/register").send({
-		name: "Test User",
-		email,
-		password,
-	});
-}
+  `login.${label}.${Date.now()}.${Math.floor(Math.random() * 10000)}@bath.ac.uk`;
 
 describe("Login tests:", () => {
-    
-	test("Rejects missing email", async () => {
-		const res = await request(app)
-			.post("/api/login")
-			.send({ password: "Password123!" });
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-		expect(res.statusCode).toBe(400);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Email and password are required.");
-	});
+  test("Rejects missing email", async () => {
+    const res = await request(app)
+      .post("/api/login")
+      .send({ password: "Password123!" });
 
-	test("Rejects unknown email", async () => {
-		const res = await request(app)
-			.post("/api/login")
-			.send({ email: makeEmail("unknown"), password: "Password123!" });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.message).toBe("Email and password are required.");
+  });
 
-		expect(res.statusCode).toBe(401);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Invalid email or password.");
-	});
+  test("Rejects unknown email", async () => {
+    const { getUser } = require("../services/userService");
+    getUser.mockResolvedValueOnce(null);
 
-	test("Rejects wrong password", async () => {
-		const email = makeEmail("wrongpw");
-		const registerRes = await registerUser(email, "Password123!");
+    const res = await request(app)
+      .post("/api/login")
+      .send({ email: makeEmail("unknown"), password: "Password123!" });
 
-		const res = await request(app)
-			.post("/api/login")
-			.send({ email, password: "Wrongpass1!" });
+    expect(res.statusCode).toBe(401);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.message).toBe("Invalid email or password.");
+  });
 
-		expect(res.statusCode).toBe(401);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Invalid email or password.");
-	});
+  test("Rejects wrong password", async () => {
+    const { getUser } = require("../services/userService");
+    const email = makeEmail("wrongpw");
+    const passkey = await bcrypt.hash("Password123!", 12);
 
-	test("Logs in user and sets token cookie", async () => {
-		const email = makeEmail("valid");
-		await registerUser(email, "Password123!");
+    getUser.mockResolvedValueOnce({
+      email,
+      name: "Test User",
+      passkey,
+    });
 
-		const res = await request(app)
-			.post("/api/login")
-			.send({ email, password: "Password123!" });
+    const res = await request(app)
+      .post("/api/login")
+      .send({ email, password: "Wrongpass1!" });
 
-		expect(res.statusCode).toBe(200);
-		expect(res.body.ok).toBe(true);
-		expect(res.body.message).toBe("Login successful.");
+    expect(res.statusCode).toBe(401);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.message).toBe("Invalid email or password.");
+  });
 
-		// Check that token is set as HTTP-only cookie
-		const setCookieHeader = res.headers["set-cookie"];
-		expect(setCookieHeader).toBeDefined();
-		expect(setCookieHeader[0]).toContain("token=");
-		expect(setCookieHeader[0]).toContain("HttpOnly");
-	});
+  test("Logs in user and sets token cookie", async () => {
+    const { getUser } = require("../services/userService");
+    const email = makeEmail("valid");
+    const passkey = await bcrypt.hash("Password123!", 12);
 
-	test("Accesses /me with valid token cookie", async () => {
-		const email = makeEmail("me");
-		await registerUser(email, "Password123!");
+    getUser.mockResolvedValueOnce({
+      email,
+      name: "Test User",
+      passkey,
+    });
 
-		const loginRes = await request(app)
-			.post("/api/login")
-			.send({ email, password: "Password123!" });
+    const res = await request(app)
+      .post("/api/login")
+      .send({ email, password: "Password123!" });
 
-		// Extract cookie from login response and use it in next request
-		const res = await request(app)
-			.get("/api/me")
-			.set("Cookie", loginRes.headers["set-cookie"][0]);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.message).toBe("Login successful.");
+    expect(res.body.user).toEqual({ name: "Test User", email });
 
-		expect(res.statusCode).toBe(200);
-		expect(res.body.ok).toBe(true);
-		expect(res.body.user.email).toBe(email);
-	});
+    const setCookieHeader = res.headers["set-cookie"];
+    expect(setCookieHeader).toBeDefined();
+    expect(setCookieHeader[0]).toContain("token=");
+    expect(setCookieHeader[0]).toContain("HttpOnly");
+  });
 
-	test("Rejects /me without token cookie", async () => {
-		const res = await request(app).get("/api/me");
+  test("Accesses /me with valid token cookie", async () => {
+    const { getUser } = require("../services/userService");
+    const email = makeEmail("me");
+    const passkey = await bcrypt.hash("Password123!", 12);
 
-		expect(res.statusCode).toBe(401);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("No token provided. Please log in.");
-	});
+    getUser.mockResolvedValueOnce({
+      email,
+      name: "Test User",
+      passkey,
+    });
 
-	test("Rejects /me with invalid token cookie", async () => {
-		const res = await request(app)
-			.get("/api/me")
-			.set("Cookie", "token=invalid.jwt.token");
+    const loginRes = await request(app)
+      .post("/api/login")
+      .send({ email, password: "Password123!" });
 
-		expect(res.statusCode).toBe(401);
-		expect(res.body.ok).toBe(false);
-		expect(res.body.message).toBe("Invalid or expired token.");
-	});
+    const res = await request(app)
+      .get("/api/me")
+      .set("Cookie", loginRes.headers["set-cookie"][0]);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.user.email).toBe(email);
+  });
+
+  test("Rejects /me without token cookie", async () => {
+    const res = await request(app).get("/api/me");
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.message).toBe("No token provided. Please log in.");
+  });
+
+  test("Rejects /me with invalid token cookie", async () => {
+    const res = await request(app)
+      .get("/api/me")
+      .set("Cookie", "token=invalid.jwt.token");
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.message).toBe("Invalid or expired token.");
+  });
 });

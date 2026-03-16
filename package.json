@@ -3,7 +3,10 @@
    "private": true,
    "scripts": {
       "install": "npm install && cd ./backend && npm install && cd ../frontend && npm install && cd ..",
-      "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\""
+      "dev": "concurrently -n frontend,backend -c blue,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+      "test": "concurrently -n frontend,backend -c blue,green \"npm run test --prefix frontend\" \"npm run test --prefix backend\"",
+      "test:coverage": "concurrently -n frontend,backend -c blue,green \"npm run test:coverage --prefix frontend\" \"npm run test:coverage --prefix backend\"",
+      "coverage:open": "start \"\" \"backend/coverage/lcov-report/index.html\" && start \"\" \"frontend/coverage/index.html\""
    },
    "devDependencies": {
       "concurrently": "^9.2.1"

@@ -258,6 +258,7 @@ const Login: React.FC<LoginProps> = ({ setIsAuthenticated }) => {
                       </a>
                     </Text>
                   </div>
+
                 </Card>
               </Col>
             </Row>

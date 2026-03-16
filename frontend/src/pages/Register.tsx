@@ -10,7 +10,6 @@ import {
   Input,
   Button,
   Space,
-  Checkbox,
   message,
 } from "antd";
 import {
@@ -64,7 +63,6 @@ interface RegisterFormValues {
   email: string;
   password: string;
   confirmPassword: string;
-  lecturer?: boolean;
 }
 
 const Register: React.FC = () => {
@@ -75,14 +73,14 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values: RegisterFormValues) => {
-    const { name, email, password, lecturer } = values;
+    const { name, email, password } = values;
     setLoading(true);
 
     try {
       const request = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, lecturer }),
+        body: JSON.stringify({ name, email, password }),
       });
 
       const data = await request.json();
@@ -275,12 +273,6 @@ const Register: React.FC = () => {
                           onVisibleChange: setPasswordVisible,
                         }}
                       />
-                    </Form.Item>
-
-                    <Form.Item name="lecturer" valuePropName="checked" style={{ marginBottom: 16 }}>
-                      <Checkbox>
-                        I am a lecturer
-                      </Checkbox>
                     </Form.Item>
 
                     <Form.Item style={{ marginBottom: 8 }}>

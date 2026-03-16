@@ -55,6 +55,27 @@ router.get("/notes/:id/files", async (req, res) => {
     }
 });
 
+// Preview a file inline by its DB id
+router.get("/files/:fileId/preview", async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            "SELECT filename, stored_name FROM note_files WHERE id = ?",
+            [req.params.fileId]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ ok: false, error: "File not found." });
+        }
+        const { stored_name } = rows[0];
+        const filePath = path.join(UPLOADS_DIR, stored_name);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ ok: false, error: "File missing from storage." });
+        }
+        res.sendFile(filePath);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 // Download a file by its DB id
 router.get("/files/:fileId", async (req, res) => {
     try {

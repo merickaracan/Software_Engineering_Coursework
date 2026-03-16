@@ -14,6 +14,7 @@ import {
   Spin,
   Empty,
   message,
+  Modal,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -25,6 +26,7 @@ import {
   CloseCircleOutlined,
   DownloadOutlined,
   PaperClipOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import PageLayout from "../components/PageHeader";
 import { useTheme } from "../components/ThemeContext";
@@ -72,6 +74,14 @@ const NoteDetailPage: React.FC = () => {
   const [userRating, setUserRating] = useState(0);
   const [hasRated, setHasRated] = useState(false);
   const [noteFiles, setNoteFiles] = useState<NoteFile[]>([]);
+  const [previewFile, setPreviewFile] = useState<NoteFile | null>(null);
+
+  const getFileExtension = (filename: string) =>
+    filename.split(".").pop()?.toLowerCase() ?? "";
+  const isPdf = (filename: string) => getFileExtension(filename) === "pdf";
+  const isImage = (filename: string) =>
+    ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(getFileExtension(filename));
+  const isPptx = (filename: string) => getFileExtension(filename) === "pptx";
 
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
@@ -310,6 +320,14 @@ const NoteDetailPage: React.FC = () => {
                 <List.Item
                   actions={[
                     <Button
+                      key="preview"
+                      type="link"
+                      icon={<EyeOutlined />}
+                      onClick={() => setPreviewFile(file)}
+                    >
+                      Preview
+                    </Button>,
+                    <Button
                       key="download"
                       type="link"
                       icon={<DownloadOutlined />}
@@ -419,6 +437,51 @@ const NoteDetailPage: React.FC = () => {
           </div>
         </Card>
       </Content>
+      {/* File Preview Modal */}
+      <Modal
+        open={!!previewFile}
+        title={previewFile?.filename}
+        onCancel={() => setPreviewFile(null)}
+        footer={
+          <Button
+            icon={<DownloadOutlined />}
+            href={previewFile ? `/api/files/${previewFile.id}` : undefined}
+            download={previewFile?.filename}
+          >
+            Download
+          </Button>
+        }
+        width="80%"
+        style={{ top: 20 }}
+      >
+        {previewFile && isPdf(previewFile.filename) && (
+          <iframe
+            src={`/api/files/${previewFile.id}/preview`}
+            style={{ width: "100%", height: "75vh", border: "none" }}
+            title={previewFile.filename}
+          />
+        )}
+        {previewFile && isImage(previewFile.filename) && (
+          <img
+            src={`/api/files/${previewFile.id}/preview`}
+            alt={previewFile.filename}
+            style={{ maxWidth: "100%", display: "block", margin: "0 auto" }}
+          />
+        )}
+        {previewFile && isPptx(previewFile.filename) && (
+          <iframe
+            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(window.location.origin + "/api/files/" + previewFile.id + "/preview")}`}
+            style={{ width: "100%", height: "75vh", border: "none" }}
+            title={previewFile.filename}
+          />
+        )}
+        {previewFile && !isPdf(previewFile.filename) && !isImage(previewFile.filename) && !isPptx(previewFile.filename) && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <PaperClipOutlined style={{ fontSize: 48, color: "#aaa", marginBottom: 16, display: "block" }} />
+            <Text type="secondary">Preview not available for this file type.</Text>
+          </div>
+        )}
+      </Modal>
     </PageLayout>
   );
 };

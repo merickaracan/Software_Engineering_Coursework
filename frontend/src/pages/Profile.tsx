@@ -93,6 +93,7 @@ const Profile: React.FC = () => {
   const user = stored ? JSON.parse(stored) : null;
   const name = user?.name ?? "No name set";
   const email = user?.email ?? "No email set";
+  const isTeacher = user?.role === "teacher";
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [rank, setRank] = useState<number | null>(null);
@@ -292,7 +293,7 @@ const Profile: React.FC = () => {
             </Card>
 
             {/* Stats / Leaderboard rank card */}
-            <Card
+            {!isTeacher && <Card
               title={
                 <span>
                   <TrophyOutlined style={{ marginRight: 8, color: isDark ? "#4da3ff" : "#0b5ed7" }} />
@@ -378,7 +379,7 @@ const Profile: React.FC = () => {
                   </Col>
                 </Row>
               )}
-            </Card>
+            </Card>}
 
             {/* Student details */}
             <Card title="Student Details" style={cardStyle}>

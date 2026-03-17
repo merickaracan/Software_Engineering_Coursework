@@ -253,19 +253,6 @@ const NoteDetailPage: React.FC = () => {
         setComments(Array.isArray(commentsData?.data) ? commentsData.data : []);
         setNoteFiles(Array.isArray(filesData?.data) ? filesData.data : []);
 
-        const firstPdfAttachment = (Array.isArray(filesData?.data) ? filesData.data : []).find((file: NoteFile) =>
-          isPdfFile(file.file_type, file.filename)
-        );
-
-        if (firstPdfAttachment) {
-          setSelectedPdfPreview({
-            url: `/api/files/${firstPdfAttachment.id}/view`,
-            name: firstPdfAttachment.filename,
-          });
-        } else {
-          setSelectedPdfPreview(null);
-        }
-
         if (currentUser.email) {
           const ratingRes = await fetch(
             `/api/notes/${id}/rating/${encodeURIComponent(currentUser.email)}`,
@@ -307,11 +294,12 @@ const NoteDetailPage: React.FC = () => {
     }
   };
 
-  const handlePreviewAttachmentPdf = (file: NoteFile) => {
-    setSelectedPdfPreview({
-      url: `/api/files/${file.id}/view`,
-      name: file.filename,
-    });
+  const handlePreview = (file: NoteFile) => {
+    if (isPdfFile(file.file_type, file.filename)) {
+      setSelectedPdfPreview({ url: `/api/files/${file.id}/view`, name: file.filename });
+    } else {
+      message.warning("Preview is not available for this file type. Please download the file to view it.");
+    }
   };
 
   const handleVerifyToggle = async () => {
@@ -580,15 +568,13 @@ const NoteDetailPage: React.FC = () => {
               renderItem={(file) => (
                 <List.Item
                   actions={[
-                    isPdfFile(file.file_type, file.filename) ? (
-                      <Button key="preview" type="link" icon={<EyeOutlined />} onClick={() => handlePreviewAttachmentPdf(file)}>
-                        Preview
-                      </Button>
-                    ) : null,
+                    <Button key="preview" type="link" icon={<EyeOutlined />} onClick={() => handlePreview(file)}>
+                      Preview
+                    </Button>,
                     <Button key="download" type="link" icon={<DownloadOutlined />} href={`/api/files/${file.id}`} download={file.filename}>
                       Download
                     </Button>,
-                  ].filter(Boolean)}
+                  ]}
                 >
                   <Text>{file.filename}</Text>
                 </List.Item>
@@ -602,18 +588,17 @@ const NoteDetailPage: React.FC = () => {
             title={
               <Space>
                 <PaperClipOutlined />
-                PDF Preview: {selectedPdfPreview.name}
+                {`Preview: ${selectedPdfPreview.name}`}
               </Space>
+            }
+            extra={
+              <Button type="text" size="small" onClick={() => setSelectedPdfPreview(null)}>
+                Close
+              </Button>
             }
             style={cardStyle}
           >
-            <div
-              style={{
-                border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`,
-                borderRadius: 6,
-                overflow: "hidden",
-              }}
-            >
+            <div style={{ border: `1px solid ${isDark ? "#434343" : "#d9d9d9"}`, borderRadius: 6, overflow: "hidden" }}>
               <iframe
                 src={selectedPdfPreview.url}
                 style={{ width: "100%", minHeight: "75vh", border: "none" }}
